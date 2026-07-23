@@ -18,14 +18,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  getLedgerCounts,
+  getOpenPOCount,
+  getRecentMovements,
   getShortageList,
   getStockSummary,
 } from "@/lib/supabase/queries";
 import { STOCK_STATUSES, type StockStatus } from "@/types/database";
 
-function num(v: number): string {
-  return v.toLocaleString("ko-KR");
+function num(v: number | null): string {
+  return (v ?? 0).toLocaleString("ko-KR");
 }
 
 const BAR_COLOR: Record<StockStatus, string> = {
@@ -73,10 +74,11 @@ function KpiCard({
 }
 
 export default async function DashboardPage() {
-  const [summary, shortage, ledger] = await Promise.all([
+  const [summary, shortage, openPO, movements] = await Promise.all([
     getStockSummary(),
     getShortageList(8),
-    getLedgerCounts(),
+    getOpenPOCount(),
+    getRecentMovements(8),
   ]);
 
   const total = summary.total || 1;
@@ -217,39 +219,56 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* 원장 데이터 현황 */}
-      <div>
-        <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-          원장 데이터 현황
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "도급발주 (PO)", value: ledger.purchase_orders },
-            { label: "사급청구", value: ledger.consigned_reqs },
-            { label: "출고기록", value: ledger.issues },
-            { label: "샵 입출고", value: ledger.v_warehouse_movements },
-          ].map((item) => (
-            <Card key={item.label}>
-              <CardHeader>
-                <CardTitle className="text-base">{item.label}</CardTitle>
-                <CardDescription>등록 건수</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <span className="text-2xl font-semibold tabular-nums">
-                  {num(item.value)}
-                </span>
-                {item.value === 0 ? (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    데이터 없음
-                  </span>
-                ) : null}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          트랜잭션(발주·출고·입출고) 데이터가 입력되면 위 건수와 KPI가 자동 반영됩니다.
-        </p>
+      {/* 발주 · 입출고 */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <KpiCard
+          title="Open 발주 (PO)"
+          description="미입고 도급발주"
+          value={num(openPO)}
+          accent={openPO > 0 ? "text-blue-600 dark:text-blue-400" : undefined}
+          href="/orders?open=1"
+        />
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base">최근 입출고</CardTitle>
+            <CardDescription>샵 입출고 최근 이동</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {movements.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                입출고 내역이 없습니다.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>일자</TableHead>
+                    <TableHead>구분</TableHead>
+                    <TableHead>자재</TableHead>
+                    <TableHead className="text-right">수량</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {movements.map((m, i) => (
+                    <TableRow key={`${m.ref_no ?? "m"}-${i}`}>
+                      <TableCell>{m.movement_date ?? "-"}</TableCell>
+                      <TableCell>{m.movement_type ?? "-"}</TableCell>
+                      <TableCell className="max-w-48 truncate">
+                        {m.material
+                          ? `${m.material.mdg_code ?? "-"} · ${m.material.material_name ?? ""}`
+                          : `#${m.material_id ?? "-"}`}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {num(m.qty)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -1,10 +1,39 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   STOCK_STATUSES,
+  type IssueRow,
+  type MaterialLite,
   type MaterialRow,
+  type PurchaseOrderRow,
   type StockStatus,
   type StockStatusRow,
+  type WarehouseMovementRow,
 } from "@/types/database";
+
+export const LEDGER_PAGE_SIZE = 25;
+
+/**
+ * material_id 를 가진 행들에 자재 요약(material)을 붙입니다.
+ * FK 임베딩에 의존하지 않고 수동 조인하여 안정적으로 동작.
+ */
+async function attachMaterials<T extends { material_id: number | null }>(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  rows: T[]
+): Promise<(T & { material: MaterialLite | null })[]> {
+  const ids = [...new Set(rows.map((r) => r.material_id).filter((v): v is number => v != null))];
+  const map = new Map<number, MaterialLite>();
+  if (ids.length > 0) {
+    const { data } = await supabase
+      .from("materials")
+      .select("id, mdg_code, material_name, part_no, unit")
+      .in("id", ids);
+    for (const m of (data ?? []) as MaterialLite[]) map.set(m.id, m);
+  }
+  return rows.map((r) => ({
+    ...r,
+    material: r.material_id != null ? map.get(r.material_id) ?? null : null,
+  }));
+}
 
 export const MATERIALS_PAGE_SIZE = 25;
 
@@ -202,4 +231,125 @@ export async function getLedgerCounts(): Promise<LedgerCounts> {
     issues: iss,
     v_warehouse_movements: mv,
   };
+}
+
+/** mdg_code 로 자재 1건 조회 (전표 등록 시 material_id 해석용) */
+export async function findMaterialByCode(
+  code: string
+): Promise<MaterialLite | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("materials")
+    .select("id, mdg_code, material_name, part_no, unit")
+    .eq("mdg_code", code.trim())
+    .maybeSingle();
+  return (data as MaterialLite | null) ?? null;
+}
+
+export interface PurchaseOrderResult {
+  rows: PurchaseOrderRow[];
+  count: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+}
+
+/** 도급발주 목록. openOnly=true 면 미입고(received_date 없음)만. */
+export async function getPurchaseOrders(params: {
+  search?: string;
+  openOnly?: boolean;
+  page?: number;
+} = {}): Promise<PurchaseOrderResult> {
+  const supabase = await createClient();
+  const page = Math.max(1, params.page ?? 1);
+  const from = (page - 1) * LEDGER_PAGE_SIZE;
+  const to = from + LEDGER_PAGE_SIZE - 1;
+
+  let query = supabase.from("purchase_orders").select("*", { count: "exact" });
+  if (params.openOnly) query = query.is("received_date", null);
+  if (params.search?.trim()) {
+    const term = params.search.trim().replace(/[%,()]/g, " ");
+    query = query.or(`po_no.ilike.%${term}%,vendor.ilike.%${term}%`);
+  }
+
+  const { data, count, error } = await query
+    .order("order_date", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to);
+  if (error) throw new Error(`발주 조회 실패: ${error.message}`);
+
+  const rows = await attachMaterials(supabase, (data ?? []) as PurchaseOrderRow[]);
+  const total = count ?? 0;
+  return {
+    rows,
+    count: total,
+    page,
+    pageSize: LEDGER_PAGE_SIZE,
+    pageCount: Math.max(1, Math.ceil(total / LEDGER_PAGE_SIZE)),
+  };
+}
+
+/** 미입고(Open) 발주 건수 */
+export async function getOpenPOCount(): Promise<number> {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("purchase_orders")
+    .select("*", { count: "exact", head: true })
+    .is("received_date", null);
+  return count ?? 0;
+}
+
+export interface IssueResult {
+  rows: IssueRow[];
+  count: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+}
+
+/** 출고 목록 */
+export async function getIssues(params: {
+  search?: string;
+  page?: number;
+} = {}): Promise<IssueResult> {
+  const supabase = await createClient();
+  const page = Math.max(1, params.page ?? 1);
+  const from = (page - 1) * LEDGER_PAGE_SIZE;
+  const to = from + LEDGER_PAGE_SIZE - 1;
+
+  let query = supabase.from("issues").select("*", { count: "exact" });
+  if (params.search?.trim()) {
+    const term = params.search.trim().replace(/[%,()]/g, " ");
+    query = query.or(`req_no.ilike.%${term}%,tool_name.ilike.%${term}%,staff.ilike.%${term}%`);
+  }
+
+  const { data, count, error } = await query
+    .order("issue_date", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to);
+  if (error) throw new Error(`출고 조회 실패: ${error.message}`);
+
+  const rows = await attachMaterials(supabase, (data ?? []) as IssueRow[]);
+  const total = count ?? 0;
+  return {
+    rows,
+    count: total,
+    page,
+    pageSize: LEDGER_PAGE_SIZE,
+    pageCount: Math.max(1, Math.ceil(total / LEDGER_PAGE_SIZE)),
+  };
+}
+
+/** 최근 입출고 (v_warehouse_movements) */
+export async function getRecentMovements(
+  limit = 8
+): Promise<WarehouseMovementRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("v_warehouse_movements")
+    .select("*")
+    .order("movement_date", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`입출고 조회 실패: ${error.message}`);
+  return attachMaterials(supabase, (data ?? []) as WarehouseMovementRow[]);
 }

@@ -43,6 +43,60 @@ export interface MaterialRow {
   is_active: boolean;
 }
 
+/** 전표에서 조인해 표시할 자재 요약 */
+export interface MaterialLite {
+  id: number;
+  mdg_code: string | null;
+  material_name: string | null;
+  part_no: string | null;
+  unit: string | null;
+}
+
+/** 도급발주 (purchase_orders) */
+export interface PurchaseOrderRow {
+  id: number;
+  po_no: string;
+  order_date: string;
+  vendor: string;
+  material_id: number | null;
+  order_qty: number;
+  received_date: string | null;
+  received_qty: number | null;
+  remark: string | null;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  material?: MaterialLite | null;
+}
+
+/** 출고기록 (issues) */
+export interface IssueRow {
+  id: number;
+  req_no: string;
+  issue_date: string;
+  material_id: number | null;
+  qty: number;
+  tool_name: string | null;
+  staff: string | null;
+  remark: string | null;
+  created_by: string | null;
+  created_at: string | null;
+  material?: MaterialLite | null;
+}
+
+/** 샵 입출고 통합 뷰 (v_warehouse_movements) */
+export interface WarehouseMovementRow {
+  movement_type: string | null;
+  ref_no: string | null;
+  movement_date: string | null;
+  material_id: number | null;
+  qty: number | null;
+  tool_name: string | null;
+  staff: string | null;
+  remark: string | null;
+  material?: MaterialLite | null;
+}
+
 /** 재고 현황 뷰 (v_stock_status) — 실제 컬럼 */
 export interface StockStatusRow {
   id: number;
