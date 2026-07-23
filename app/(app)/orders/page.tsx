@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { DeleteButton } from "@/app/(app)/orders/delete-button";
 import { OrderForm } from "@/app/(app)/orders/order-form";
 import { ReceiveForm } from "@/app/(app)/orders/receive-form";
 import { Badge } from "@/components/ui/badge";
@@ -108,6 +109,7 @@ export default async function OrdersPage({
               <TableHead className="text-right">발주수량</TableHead>
               <TableHead className="text-right">입고수량</TableHead>
               <TableHead>상태 / 입고처리</TableHead>
+              <TableHead className="text-right">관리</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -115,7 +117,7 @@ export default async function OrdersPage({
               <TableRow>
                 <TableCell
                   className="h-24 text-center text-muted-foreground"
-                  colSpan={7}
+                  colSpan={8}
                 >
                   발주 내역이 없습니다. 위 &ldquo;신규 발주 등록&rdquo;으로 추가하세요.
                 </TableCell>
@@ -147,6 +149,9 @@ export default async function OrdersPage({
                       ) : (
                         <ReceiveForm id={row.id} defaultQty={row.order_qty} />
                       )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DeleteButton id={row.id} label={row.po_no} />
                     </TableCell>
                   </TableRow>
                 );

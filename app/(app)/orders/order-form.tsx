@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { createPurchaseOrder } from "@/app/(app)/orders/actions";
@@ -26,14 +26,24 @@ export function OrderForm() {
     initialFormState
   );
   const formRef = useRef<HTMLFormElement>(null);
+  const nextKey = useRef(1);
+  const [lines, setLines] = useState<number[]>([0]);
 
   useEffect(() => {
-    if (state.message) formRef.current?.reset();
+    if (state.message) {
+      formRef.current?.reset();
+      setLines([nextKey.current++]);
+    }
   }, [state.message]);
 
+  const addLine = () => setLines((ls) => [...ls, nextKey.current++]);
+  const removeLine = (k: number) =>
+    setLines((ls) => (ls.length > 1 ? ls.filter((x) => x !== k) : ls));
+
   return (
-    <form ref={formRef} action={formAction} className="flex flex-col gap-4">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <form ref={formRef} action={formAction} className="flex flex-col gap-5">
+      {/* 발주 헤더 */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="po_no">발주번호 *</Label>
           <Input id="po_no" name="po_no" placeholder="PO-2026-0001" required />
@@ -53,23 +63,53 @@ export function OrderForm() {
           <Input id="vendor" name="vendor" placeholder="공급업체명" required />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="mdg_code">MDG코드 *</Label>
-          <Input id="mdg_code" name="mdg_code" placeholder="예: 536691" required />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="order_qty">발주수량 *</Label>
-          <Input
-            id="order_qty"
-            name="order_qty"
-            type="number"
-            min={1}
-            step="any"
-            required
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
           <Label htmlFor="remark">비고</Label>
           <Input id="remark" name="remark" placeholder="선택" />
+        </div>
+      </div>
+
+      {/* 품목 (복수) */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">품목 (MDG코드)</span>
+          <Button type="button" variant="outline" size="sm" onClick={addLine}>
+            + 품목 추가
+          </Button>
+        </div>
+        <div className="flex flex-col gap-2">
+          {lines.map((k) => (
+            <div key={k} className="flex items-end gap-2">
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Label className="text-xs text-muted-foreground">MDG코드 *</Label>
+                <Input
+                  name="mdg_code"
+                  placeholder="예: 536691"
+                  aria-label="MDG코드"
+                />
+              </div>
+              <div className="flex w-32 flex-col gap-1.5">
+                <Label className="text-xs text-muted-foreground">수량 *</Label>
+                <Input
+                  name="qty"
+                  type="number"
+                  min={1}
+                  step="any"
+                  aria-label="발주수량"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => removeLine(k)}
+                disabled={lines.length === 1}
+                aria-label="품목 삭제"
+                className="text-muted-foreground"
+              >
+                ✕
+              </Button>
+            </div>
+          ))}
         </div>
       </div>
 
