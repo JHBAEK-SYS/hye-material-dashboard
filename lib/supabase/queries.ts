@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   STOCK_STATUSES,
+  type ConsignedReqRow,
   type IssueRow,
   type MaterialLite,
   type MaterialRow,
@@ -330,6 +331,49 @@ export async function getIssues(params: {
   if (error) throw new Error(`출고 조회 실패: ${error.message}`);
 
   const rows = await attachMaterials(supabase, (data ?? []) as IssueRow[]);
+  const total = count ?? 0;
+  return {
+    rows,
+    count: total,
+    page,
+    pageSize: LEDGER_PAGE_SIZE,
+    pageCount: Math.max(1, Math.ceil(total / LEDGER_PAGE_SIZE)),
+  };
+}
+
+export interface ConsignedReqResult {
+  rows: ConsignedReqRow[];
+  count: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+}
+
+/** 사급청구 목록. openOnly=true 면 미입고(received_date 없음)만. */
+export async function getConsignedReqs(params: {
+  search?: string;
+  openOnly?: boolean;
+  page?: number;
+} = {}): Promise<ConsignedReqResult> {
+  const supabase = await createClient();
+  const page = Math.max(1, params.page ?? 1);
+  const from = (page - 1) * LEDGER_PAGE_SIZE;
+  const to = from + LEDGER_PAGE_SIZE - 1;
+
+  let query = supabase.from("consigned_reqs").select("*", { count: "exact" });
+  if (params.openOnly) query = query.is("received_date", null);
+  if (params.search?.trim()) {
+    const term = params.search.trim().replace(/[%,()]/g, " ");
+    query = query.or(`sg_no.ilike.%${term}%`);
+  }
+
+  const { data, count, error } = await query
+    .order("request_date", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to);
+  if (error) throw new Error(`사급청구 조회 실패: ${error.message}`);
+
+  const rows = await attachMaterials(supabase, (data ?? []) as ConsignedReqRow[]);
   const total = count ?? 0;
   return {
     rows,

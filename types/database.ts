@@ -69,6 +69,22 @@ export interface PurchaseOrderRow {
   material?: MaterialLite | null;
 }
 
+/** 사급청구 (consigned_reqs) */
+export interface ConsignedReqRow {
+  id: number;
+  sg_no: string;
+  request_date: string;
+  material_id: number | null;
+  request_qty: number;
+  received_date: string | null;
+  received_qty: number | null;
+  remark: string | null;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  material?: MaterialLite | null;
+}
+
 /** 출고기록 (issues) */
 export interface IssueRow {
   id: number;

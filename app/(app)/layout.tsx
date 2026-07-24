@@ -8,6 +8,7 @@ const NAV = [
   { href: "/dashboard", label: "대시보드" },
   { href: "/materials", label: "자재 마스터" },
   { href: "/orders", label: "도급발주" },
+  { href: "/consigned-reqs", label: "사급청구" },
   { href: "/issues", label: "출고기록" },
 ];
 
