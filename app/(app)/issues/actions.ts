@@ -2,54 +2,79 @@
 
 import { revalidatePath } from "next/cache";
 
+import { validateIssueHeader, validateIssueLines } from "@/lib/issues/validate";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "@/lib/form-state";
 
-/** 신규 출고 등록 */
+/**
+ * 신규 출고 등록 — 하나의 청구번호(req_no)에 여러 품목(MDG코드) 동시 등록.
+ * 품목 수만큼 issues 행을 생성한다.
+ */
 export async function createIssue(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
   const req_no = String(formData.get("req_no") ?? "").trim();
   const issue_date = String(formData.get("issue_date") ?? "").trim();
-  const mdg_code = String(formData.get("mdg_code") ?? "").trim();
-  const qty = Number(formData.get("qty"));
   const tool_name = String(formData.get("tool_name") ?? "").trim() || null;
   const staff = String(formData.get("staff") ?? "").trim() || null;
   const remark = String(formData.get("remark") ?? "").trim() || null;
 
-  if (!req_no || !issue_date || !mdg_code) {
-    return { error: "청구번호·출고일·MDG코드는 필수입니다.", message: null };
+  const mdgCodes = formData.getAll("mdg_code").map((v) => String(v).trim());
+  const qtys = formData.getAll("qty").map((v) => String(v).trim());
+
+  const headerError = validateIssueHeader({ req_no, issue_date });
+  if (headerError) {
+    return { error: headerError, message: null };
   }
-  if (!Number.isFinite(qty) || qty <= 0) {
-    return { error: "출고수량은 0보다 큰 숫자여야 합니다.", message: null };
+
+  // 품목 줄 취합 (빈 줄 건너뜀)
+  const lines: { mdg_code: string; qty: string }[] = [];
+  for (let i = 0; i < mdgCodes.length; i++) {
+    const code = mdgCodes[i];
+    if (!code) continue;
+    lines.push({ mdg_code: code, qty: qtys[i] ?? "" });
+  }
+
+  const linesError = validateIssueLines(lines);
+  if (linesError) {
+    return { error: linesError, message: null };
   }
 
   const supabase = await createClient();
 
-  const { data: material } = await supabase
+  // MDG코드 → material_id 일괄 해석
+  const codes = [...new Set(lines.map((l) => l.mdg_code))];
+  const { data: mats } = await supabase
     .from("materials")
-    .select("id")
-    .eq("mdg_code", mdg_code)
-    .maybeSingle();
-  if (!material) {
-    return { error: `MDG코드 '${mdg_code}' 에 해당하는 자재가 없습니다.`, message: null };
+    .select("id, mdg_code")
+    .in("mdg_code", codes);
+  const map = new Map(
+    ((mats ?? []) as { id: number; mdg_code: string }[]).map((m) => [
+      m.mdg_code,
+      m.id,
+    ])
+  );
+  const missing = codes.filter((c) => !map.has(c));
+  if (missing.length > 0) {
+    return { error: `존재하지 않는 MDG코드: ${missing.join(", ")}`, message: null };
   }
 
-  const { data, error } = await supabase
-    .from("issues")
-    .insert({
-      req_no,
-      issue_date,
-      material_id: (material as { id: number }).id,
-      qty,
-      tool_name,
-      staff,
-      remark,
-    })
-    .select();
+  const rows = lines.map((l) => ({
+    req_no,
+    issue_date,
+    material_id: map.get(l.mdg_code)!,
+    qty: Number(l.qty),
+    tool_name,
+    staff,
+    remark,
+  }));
 
-  if (error) return { error: `저장 실패: ${error.message}`, message: null };
+  const { data, error } = await supabase.from("issues").insert(rows).select();
+
+  if (error) {
+    return { error: `저장 실패: ${error.message}`, message: null };
+  }
   if (!data || data.length === 0) {
     return {
       error:
@@ -60,5 +85,8 @@ export async function createIssue(
 
   revalidatePath("/issues");
   revalidatePath("/dashboard");
-  return { error: null, message: `출고 '${req_no}' 가 등록되었습니다.` };
+  return {
+    error: null,
+    message: `출고 '${req_no}' — ${data.length}개 품목이 등록되었습니다.`,
+  };
 }
