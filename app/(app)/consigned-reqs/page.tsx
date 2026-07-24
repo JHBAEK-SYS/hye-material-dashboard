@@ -43,10 +43,23 @@ export default async function ConsignedReqsPage({
     return `/consigned-reqs?${params.toString()}`;
   };
 
+  const exportHref = (() => {
+    const params = new URLSearchParams();
+    if (search) params.set("q", search);
+    if (openOnly) params.set("open", "1");
+    const qs = params.toString();
+    return `/api/export/consigned-reqs${qs ? `?${qs}` : ""}`;
+  })();
+
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">사급청구</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">사급청구</h1>
+          <a href={exportHref} className={buttonVariants({ variant: "outline" })}>
+            엑셀 다운로드
+          </a>
+        </div>
         <p className="text-sm text-muted-foreground">
           사급청구 등록 · 입고처리 · 미입고 현황 · 총 {num(result.count)}건
         </p>

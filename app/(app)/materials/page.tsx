@@ -53,10 +53,24 @@ export default async function MaterialsPage({
   const rangeStart = result.count === 0 ? 0 : (page - 1) * result.pageSize + 1;
   const rangeEnd = Math.min(page * result.pageSize, result.count);
 
+  const exportHref = (() => {
+    const params = new URLSearchParams();
+    if (search) params.set("q", search);
+    if (status) params.set("status", status);
+    if (activeOnly) params.set("active", "1");
+    const qs = params.toString();
+    return `/api/export/materials${qs ? `?${qs}` : ""}`;
+  })();
+
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">자재 마스터</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">자재 마스터</h1>
+          <a href={exportHref} className={buttonVariants({ variant: "outline" })}>
+            엑셀 다운로드
+          </a>
+        </div>
         <p className="text-sm text-muted-foreground">
           재고 현황(v_stock_status) 기준 · 총 {num(result.count)}건
         </p>

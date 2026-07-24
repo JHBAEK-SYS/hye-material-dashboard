@@ -397,3 +397,174 @@ export async function getRecentMovements(
   if (error) throw new Error(`입출고 조회 실패: ${error.message}`);
   return attachMaterials(supabase, (data ?? []) as WarehouseMovementRow[]);
 }
+
+// ---------------------------------------------------------------------------
+// Export(엑셀 다운로드) 전용 전량 조회
+//
+// Supabase(PostgREST) 는 한 번의 select 에서 기본 최대 1,000행만 반환한다.
+// 목록 화면의 페이지네이션 함수(getMaterials 등)는 25건씩만 가져오므로 문제가
+// 없지만, 엑셀 export 는 "현재 필터 조건에 맞는 전체 행"을 내려줘야 하므로
+// 1,000행 단위로 .range(from, to) 를 반복 호출해 더 이상 행이 없을 때까지
+// 모아야 한다. 무한 루프 방지를 위한 안전 상한도 둔다.
+// ---------------------------------------------------------------------------
+
+const EXPORT_BATCH_SIZE = 1000;
+const EXPORT_MAX_BATCHES = 50; // 안전 상한: 최대 50,000행
+
+/**
+ * `buildQuery(from, to)` 가 반환하는 쿼리를 배치 크기(EXPORT_BATCH_SIZE)만큼
+ * 반복 실행해 전체 행을 모으는 헬퍼. 마지막 배치의 행 수가 배치 크기보다
+ * 작으면(=더 가져올 행이 없으면) 종료한다. EXPORT_MAX_BATCHES 를 넘으면
+ * 무한 루프를 막기 위해 강제 종료한다.
+ */
+async function fetchAllRows<T>(
+  buildQuery: (
+    from: number,
+    to: number
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  errorPrefix: string
+): Promise<T[]> {
+  const all: T[] = [];
+  for (let batch = 0; batch < EXPORT_MAX_BATCHES; batch++) {
+    const from = batch * EXPORT_BATCH_SIZE;
+    const to = from + EXPORT_BATCH_SIZE - 1;
+    const { data, error } = await buildQuery(from, to);
+    if (error) throw new Error(`${errorPrefix}: ${error.message}`);
+    const rows = data ?? [];
+    all.push(...rows);
+    if (rows.length < EXPORT_BATCH_SIZE) break;
+  }
+  return all;
+}
+
+export interface MaterialsExportQuery {
+  search?: string;
+  status?: StockStatus;
+  activeOnly?: boolean;
+}
+
+/**
+ * 자재 목록 전량 조회 (엑셀 export 용).
+ * getMaterials 와 완전히 동일한 필터/정렬을 적용하되, 페이지네이션 없이
+ * 조건에 맞는 전체 행을 1,000건씩 배치로 모아 반환한다.
+ */
+export async function getAllMaterialsForExport(
+  params: MaterialsExportQuery = {}
+): Promise<StockStatusRow[]> {
+  const supabase = await createClient();
+
+  const buildBase = () => {
+    let query = supabase.from("v_stock_status").select("*");
+    if (params.activeOnly) {
+      query = query.eq("is_active", true);
+    }
+    if (params.status) {
+      query = query.eq("status", params.status);
+    }
+    if (params.search) {
+      const term = params.search.trim();
+      if (term) {
+        const escaped = term.replace(/[%,()]/g, " ");
+        query = query.or(
+          `mdg_code.ilike.%${escaped}%,part_no.ilike.%${escaped}%,material_name.ilike.%${escaped}%`
+        );
+      }
+    }
+    return query.order("mdg_code", { ascending: true });
+  };
+
+  return fetchAllRows<StockStatusRow>(
+    (from, to) => buildBase().range(from, to),
+    "자재 전체 조회 실패"
+  );
+}
+
+export interface PurchaseOrdersExportQuery {
+  search?: string;
+  openOnly?: boolean;
+}
+
+/** 도급발주 전량 조회 (엑셀 export 용). getPurchaseOrders 와 동일한 필터/정렬. */
+export async function getAllPurchaseOrdersForExport(
+  params: PurchaseOrdersExportQuery = {}
+): Promise<PurchaseOrderRow[]> {
+  const supabase = await createClient();
+
+  const buildBase = () => {
+    let query = supabase.from("purchase_orders").select("*");
+    if (params.openOnly) query = query.is("received_date", null);
+    if (params.search?.trim()) {
+      const term = params.search.trim().replace(/[%,()]/g, " ");
+      query = query.or(`po_no.ilike.%${term}%,vendor.ilike.%${term}%`);
+    }
+    return query
+      .order("order_date", { ascending: false })
+      .order("id", { ascending: false });
+  };
+
+  const rows = await fetchAllRows<PurchaseOrderRow>(
+    (from, to) => buildBase().range(from, to),
+    "발주 전체 조회 실패"
+  );
+  return attachMaterials(supabase, rows);
+}
+
+export interface ConsignedReqsExportQuery {
+  search?: string;
+  openOnly?: boolean;
+}
+
+/** 사급청구 전량 조회 (엑셀 export 용). getConsignedReqs 와 동일한 필터/정렬. */
+export async function getAllConsignedReqsForExport(
+  params: ConsignedReqsExportQuery = {}
+): Promise<ConsignedReqRow[]> {
+  const supabase = await createClient();
+
+  const buildBase = () => {
+    let query = supabase.from("consigned_reqs").select("*");
+    if (params.openOnly) query = query.is("received_date", null);
+    if (params.search?.trim()) {
+      const term = params.search.trim().replace(/[%,()]/g, " ");
+      query = query.or(`sg_no.ilike.%${term}%`);
+    }
+    return query
+      .order("request_date", { ascending: false })
+      .order("id", { ascending: false });
+  };
+
+  const rows = await fetchAllRows<ConsignedReqRow>(
+    (from, to) => buildBase().range(from, to),
+    "사급청구 전체 조회 실패"
+  );
+  return attachMaterials(supabase, rows);
+}
+
+export interface IssuesExportQuery {
+  search?: string;
+}
+
+/** 출고기록 전량 조회 (엑셀 export 용). getIssues 와 동일한 필터/정렬. */
+export async function getAllIssuesForExport(
+  params: IssuesExportQuery = {}
+): Promise<IssueRow[]> {
+  const supabase = await createClient();
+
+  const buildBase = () => {
+    let query = supabase.from("issues").select("*");
+    if (params.search?.trim()) {
+      const term = params.search.trim().replace(/[%,()]/g, " ");
+      query = query.or(
+        `req_no.ilike.%${term}%,tool_name.ilike.%${term}%,staff.ilike.%${term}%`
+      );
+    }
+    return query
+      .order("issue_date", { ascending: false })
+      .order("id", { ascending: false });
+  };
+
+  const rows = await fetchAllRows<IssueRow>(
+    (from, to) => buildBase().range(from, to),
+    "출고 전체 조회 실패"
+  );
+  return attachMaterials(supabase, rows);
+}
