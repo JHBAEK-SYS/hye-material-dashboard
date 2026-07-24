@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { contentDisposition } from "@/lib/excel/content-disposition";
 import {
   consignedReqsSheet,
   issuesSheet,
@@ -28,6 +29,14 @@ const FILE_LABELS: Record<string, string> = {
   orders: "도급발주",
   "consigned-reqs": "사급청구",
   issues: "출고기록",
+};
+
+/** 화면별 다운로드 파일명(ASCII, 구형 브라우저용 Content-Disposition fallback) */
+const FILE_LABELS_ASCII: Record<string, string> = {
+  materials: "materials",
+  orders: "purchase-orders",
+  "consigned-reqs": "consigned-reqs",
+  issues: "issues",
 };
 
 function todayStamp(): string {
@@ -59,10 +68,6 @@ async function buildWorkbookBuffer(spec: SheetSpec): Promise<Buffer> {
 
   const arrayBuffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(arrayBuffer);
-}
-
-function encodedFilename(name: string): string {
-  return `attachment; filename="${name}"; filename*=UTF-8''${encodeURIComponent(name)}`;
 }
 
 export async function GET(
@@ -133,14 +138,16 @@ export async function GET(
     }
 
     const buffer = await buildWorkbookBuffer(spec);
-    const filename = `${FILE_LABELS[exportType]}_${todayStamp()}.xlsx`;
+    const stamp = todayStamp();
+    const filename = `${FILE_LABELS[exportType]}_${stamp}.xlsx`;
+    const asciiFilename = `${FILE_LABELS_ASCII[exportType]}_${stamp}.xlsx`;
 
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": encodedFilename(filename),
+        "Content-Disposition": contentDisposition(asciiFilename, filename),
       },
     });
   } catch (error) {
