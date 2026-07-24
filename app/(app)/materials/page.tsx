@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { MaterialForm } from "@/app/(app)/materials/material-form";
 import { StatusBadge } from "@/components/status-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +61,16 @@ export default async function MaterialsPage({
           재고 현황(v_stock_status) 기준 · 총 {num(result.count)}건
         </p>
       </div>
+
+      {/* 신규 등록 */}
+      <details className="rounded-lg border">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+          + 신규 자재 등록
+        </summary>
+        <div className="border-t p-4">
+          <MaterialForm />
+        </div>
+      </details>
 
       {/* 필터 */}
       <form

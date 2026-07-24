@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DeleteMaterialButton } from "@/app/(app)/materials/[id]/delete-material-button";
 import { EditForm } from "@/app/(app)/materials/[id]/edit-form";
 import { StatusBadge } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -105,6 +106,23 @@ export default async function MaterialDetailPage({
         </CardHeader>
         <CardContent>
           <EditForm material={material} />
+        </CardContent>
+      </Card>
+
+      {/* 위험 구역: 삭제 */}
+      <Card className="border-destructive/40">
+        <CardHeader>
+          <CardTitle className="text-base text-destructive">위험 구역</CardTitle>
+          <CardDescription>
+            전표(발주/출고/사급청구)가 참조 중인 자재는 삭제할 수 없습니다. 그런
+            경우 위 편집에서 &apos;활성 자재&apos;를 꺼서 비활성 처리하세요.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DeleteMaterialButton
+            id={material.id}
+            label={material.mdg_code ?? String(material.id)}
+          />
         </CardContent>
       </Card>
     </div>
