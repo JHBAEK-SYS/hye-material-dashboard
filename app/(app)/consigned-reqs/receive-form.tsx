@@ -23,16 +23,18 @@ const today = () => new Date().toISOString().slice(0, 10);
 export function ReceiveForm({
   id,
   defaultQty,
+  defaultRemark,
 }: {
   id: number;
   defaultQty: number;
+  defaultRemark: string | null;
 }) {
   const [state, formAction] = useActionState(
     receiveConsignedReq,
     initialFormState
   );
   return (
-    <form action={formAction} className="flex items-center gap-1.5">
+    <form action={formAction} className="flex flex-wrap items-center gap-1.5">
       <input type="hidden" name="id" value={id} />
       <Input
         name="received_qty"
@@ -49,6 +51,14 @@ export function ReceiveForm({
         defaultValue={today()}
         className="h-8 w-36"
         aria-label="입고일"
+      />
+      <Input
+        name="remark"
+        type="text"
+        defaultValue={defaultRemark ?? ""}
+        placeholder="비고 (예: 1차 1/3 20개)"
+        className="h-8 w-40"
+        aria-label="비고"
       />
       <Btn />
       {state.error ? (

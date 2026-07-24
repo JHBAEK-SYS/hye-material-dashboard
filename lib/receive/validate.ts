@@ -48,3 +48,46 @@ export function validateReceiveInput(input: {
 
   return null;
 }
+
+export type ReceiptStatus = "미입고" | "부분입고" | "입고완료";
+
+/**
+ * 발주/청구 수량(orderQty)과 누적 입고수량(receivedQty)으로 상태를 판정한다.
+ * 초과 입고(receivedQty > orderQty)는 실무상 과납품으로 허용하며 "입고완료"로 취급한다.
+ * orderQty가 0 이하이거나 비정상인 경우에도 죽지 않도록 방어적으로 처리한다.
+ */
+export function receiptStatus(
+  orderQty: number,
+  receivedQty: number | null
+): ReceiptStatus {
+  const safeOrderQty = Number.isFinite(orderQty) ? orderQty : 0;
+  const safeReceivedQty =
+    receivedQty != null && Number.isFinite(receivedQty) ? receivedQty : 0;
+
+  if (safeReceivedQty <= 0) {
+    return "미입고";
+  }
+  if (safeOrderQty <= 0) {
+    return "입고완료";
+  }
+  if (safeReceivedQty >= safeOrderQty) {
+    return "입고완료";
+  }
+  return "부분입고";
+}
+
+/**
+ * 남은 수량 = orderQty - receivedQty. 음수가 되지 않도록 0으로 하한한다.
+ * orderQty가 0 이하이거나 비정상인 경우에도 죽지 않도록 방어적으로 처리한다.
+ */
+export function remainingQty(
+  orderQty: number,
+  receivedQty: number | null
+): number {
+  const safeOrderQty = Number.isFinite(orderQty) ? orderQty : 0;
+  const safeReceivedQty =
+    receivedQty != null && Number.isFinite(receivedQty) ? receivedQty : 0;
+
+  const remaining = safeOrderQty - safeReceivedQty;
+  return remaining > 0 ? remaining : 0;
+}

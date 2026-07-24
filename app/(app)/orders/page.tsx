@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { receiptStatus, remainingQty } from "@/lib/receive/validate";
 import { getPurchaseOrders } from "@/lib/supabase/queries";
 
 type SearchParams = Promise<{ q?: string; open?: string; page?: string }>;
@@ -124,7 +125,8 @@ export default async function OrdersPage({
               </TableRow>
             ) : (
               result.rows.map((row) => {
-                const received = row.received_date != null;
+                const status = receiptStatus(row.order_qty, row.received_qty);
+                const remaining = remainingQty(row.order_qty, row.received_qty);
                 return (
                   <TableRow key={row.id}>
                     <TableCell className="font-medium">{row.po_no}</TableCell>
@@ -139,15 +141,31 @@ export default async function OrdersPage({
                       {num(row.order_qty)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {received ? num(row.received_qty) : "-"}
+                      {(row.received_qty ?? 0) > 0 ? num(row.received_qty) : "-"}
                     </TableCell>
                     <TableCell>
-                      {received ? (
+                      {status === "입고완료" ? (
                         <Badge className="border-transparent bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                           입고완료 {row.received_date}
                         </Badge>
+                      ) : status === "부분입고" ? (
+                        <div className="flex flex-col gap-1.5">
+                          <Badge className="border-transparent bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                            부분입고 {num(row.received_qty)}/{num(row.order_qty)}
+                            {row.received_date ? ` · ${row.received_date}` : ""}
+                          </Badge>
+                          <ReceiveForm
+                            id={row.id}
+                            defaultQty={remaining}
+                            defaultRemark={row.remark}
+                          />
+                        </div>
                       ) : (
-                        <ReceiveForm id={row.id} defaultQty={row.order_qty} />
+                        <ReceiveForm
+                          id={row.id}
+                          defaultQty={remaining}
+                          defaultRemark={row.remark}
+                        />
                       )}
                     </TableCell>
                     <TableCell className="text-right">

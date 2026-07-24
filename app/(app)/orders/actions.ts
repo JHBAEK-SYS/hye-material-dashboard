@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import { validateReceiveInput } from "@/lib/receive/validate";
+import {
+  receiptStatus,
+  remainingQty,
+  validateReceiveInput,
+} from "@/lib/receive/validate";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "@/lib/form-state";
 
@@ -108,7 +112,11 @@ export async function createPurchaseOrder(
   };
 }
 
-/** 발주 입고처리 (received_date=사용자 입력값, received_qty=입력값) */
+/**
+ * 발주 입고처리 (received_date=사용자 입력값, received_qty=기존 누적값 + 입력값, remark=입력값으로 덮어씀).
+ * 동시성 주의: read-then-write 방식이라 두 사용자가 동시에 같은 행을 입고처리하면
+ * 나중에 쓴 쪽이 먼저 쓴 쪽의 누적을 덮어쓸 수 있다 (이 프로젝트 규모에서는 허용 가능한 트레이드오프).
+ */
 export async function receivePurchaseOrder(
   _prev: FormState,
   formData: FormData
@@ -116,6 +124,7 @@ export async function receivePurchaseOrder(
   const id = Number(formData.get("id"));
   const received_date = String(formData.get("received_date") ?? "").trim();
   const received_qty = String(formData.get("received_qty") ?? "").trim();
+  const remark = String(formData.get("remark") ?? "").trim() || null;
 
   const validationError = validateReceiveInput({
     id,
@@ -127,9 +136,22 @@ export async function receivePurchaseOrder(
   }
 
   const supabase = await createClient();
+
+  const { data: current } = await supabase
+    .from("purchase_orders")
+    .select("order_qty, received_qty")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!current) {
+    return { error: "대상 발주를 찾을 수 없습니다.", message: null };
+  }
+
+  const nextQty = (current.received_qty ?? 0) + Number(received_qty);
+
   const { data, error } = await supabase
     .from("purchase_orders")
-    .update({ received_date, received_qty: Number(received_qty) })
+    .update({ received_date, received_qty: nextQty, remark })
     .eq("id", id)
     .select();
 
@@ -142,9 +164,15 @@ export async function receivePurchaseOrder(
     };
   }
 
+  const status = receiptStatus(current.order_qty, nextQty);
+  const message =
+    status === "부분입고"
+      ? `부분입고 처리되었습니다. (누적 ${nextQty}/${current.order_qty}, 남은 수량 ${remainingQty(current.order_qty, nextQty)})`
+      : "입고처리 되었습니다.";
+
   revalidatePath("/orders");
   revalidatePath("/dashboard");
-  return { error: null, message: "입고처리 되었습니다." };
+  return { error: null, message };
 }
 
 /** 발주 품목 삭제 (실수 복구용) */

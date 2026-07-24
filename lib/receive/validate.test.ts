@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { validateReceiveInput } from "@/lib/receive/validate";
+import {
+  receiptStatus,
+  remainingQty,
+  validateReceiveInput,
+} from "@/lib/receive/validate";
 
 const validInput = {
   id: 1,
@@ -127,5 +131,89 @@ describe("validateReceiveInput", () => {
       received_qty: "1.5",
     });
     expect(result).toBeNull();
+  });
+});
+
+describe("receiptStatus", () => {
+  it("receivedQty가 null이면 미입고를 반환한다", () => {
+    expect(receiptStatus(30, null)).toBe("미입고");
+  });
+
+  it("receivedQty가 0이면 미입고를 반환한다", () => {
+    expect(receiptStatus(30, 0)).toBe("미입고");
+  });
+
+  it("receivedQty가 음수이면 미입고를 반환한다", () => {
+    expect(receiptStatus(30, -5)).toBe("미입고");
+  });
+
+  it("0 < receivedQty < orderQty 이면 부분입고를 반환한다 (20/30)", () => {
+    expect(receiptStatus(30, 20)).toBe("부분입고");
+  });
+
+  it("receivedQty === orderQty 이면 입고완료를 반환한다 (30/30)", () => {
+    expect(receiptStatus(30, 30)).toBe("입고완료");
+  });
+
+  it("receivedQty > orderQty(초과입고) 이면 입고완료를 반환한다 (35/30)", () => {
+    expect(receiptStatus(30, 35)).toBe("입고완료");
+  });
+
+  it("소수 수량도 올바르게 판정한다 (부분입고)", () => {
+    expect(receiptStatus(30.5, 20.25)).toBe("부분입고");
+  });
+
+  it("소수 수량이 정확히 일치하면 입고완료를 반환한다", () => {
+    expect(receiptStatus(30.5, 30.5)).toBe("입고완료");
+  });
+
+  it("orderQty가 0이어도 죽지 않고 처리한다 (receivedQty 0 -> 미입고)", () => {
+    expect(receiptStatus(0, 0)).toBe("미입고");
+  });
+
+  it("orderQty가 0이고 receivedQty가 양수이면 입고완료를 반환한다", () => {
+    expect(receiptStatus(0, 5)).toBe("입고완료");
+  });
+
+  it("orderQty가 음수이어도 죽지 않는다", () => {
+    expect(() => receiptStatus(-10, 5)).not.toThrow();
+  });
+});
+
+describe("remainingQty", () => {
+  it("receivedQty가 null이면 orderQty 전체를 반환한다", () => {
+    expect(remainingQty(30, null)).toBe(30);
+  });
+
+  it("receivedQty가 0이면 orderQty 전체를 반환한다", () => {
+    expect(remainingQty(30, 0)).toBe(30);
+  });
+
+  it("부분입고(20/30)이면 남은 수량 10을 반환한다", () => {
+    expect(remainingQty(30, 20)).toBe(10);
+  });
+
+  it("전량입고(30/30)이면 남은 수량 0을 반환한다", () => {
+    expect(remainingQty(30, 30)).toBe(0);
+  });
+
+  it("초과입고(35/30)이어도 남은 수량은 0으로 하한한다", () => {
+    expect(remainingQty(30, 35)).toBe(0);
+  });
+
+  it("소수 수량의 남은 수량을 정확히 계산한다", () => {
+    expect(remainingQty(30.5, 20.25)).toBeCloseTo(10.25);
+  });
+
+  it("orderQty가 0이면 음수가 되지 않도록 0을 반환한다", () => {
+    expect(remainingQty(0, 0)).toBe(0);
+  });
+
+  it("orderQty가 0이고 receivedQty가 양수여도 남은 수량은 0이다", () => {
+    expect(remainingQty(0, 5)).toBe(0);
+  });
+
+  it("orderQty가 음수이어도 남은 수량은 0으로 하한한다", () => {
+    expect(remainingQty(-10, 0)).toBe(0);
   });
 });
