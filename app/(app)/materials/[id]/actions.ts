@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getCanEdit } from "@/lib/auth/editor";
 import { createClient } from "@/lib/supabase/server";
 import type { UpdateState } from "@/app/(app)/materials/[id]/update-state";
 
@@ -14,6 +15,10 @@ export async function updateMaterial(
   _prev: UpdateState,
   formData: FormData
 ): Promise<UpdateState> {
+  if (!(await getCanEdit())) {
+    return { error: "수정 권한이 없습니다. 관리자에게 문의하세요.", message: null };
+  }
+
   const id = Number(formData.get("id"));
   if (!Number.isFinite(id) || id <= 0) {
     return { error: "잘못된 자재 ID 입니다.", message: null };

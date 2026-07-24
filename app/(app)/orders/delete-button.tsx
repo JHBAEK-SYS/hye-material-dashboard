@@ -7,23 +7,32 @@ import { deletePurchaseOrder } from "@/app/(app)/orders/actions";
 import { Button } from "@/components/ui/button";
 import { initialFormState } from "@/lib/form-state";
 
-function Btn() {
+function Btn({ canEdit }: { canEdit: boolean }) {
   const { pending } = useFormStatus();
   return (
     <Button
       type="submit"
       variant="ghost"
       size="sm"
-      disabled={pending}
+      disabled={!canEdit || pending}
       className="text-destructive hover:text-destructive"
       aria-label="삭제"
+      title={canEdit ? undefined : "수정 권한이 없습니다"}
     >
       {pending ? "…" : "🗑 삭제"}
     </Button>
   );
 }
 
-export function DeleteButton({ id, label }: { id: number; label: string }) {
+export function DeleteButton({
+  id,
+  label,
+  canEdit,
+}: {
+  id: number;
+  label: string;
+  canEdit: boolean;
+}) {
   const [state, formAction] = useActionState(
     deletePurchaseOrder,
     initialFormState
@@ -38,7 +47,7 @@ export function DeleteButton({ id, label }: { id: number; label: string }) {
       }}
     >
       <input type="hidden" name="id" value={id} />
-      <Btn />
+      <Btn canEdit={canEdit} />
       {state.error ? (
         <span className="ml-1 text-xs text-destructive">{state.error}</span>
       ) : null}

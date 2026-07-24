@@ -12,10 +12,10 @@ import { initialFormState } from "@/lib/form-state";
 
 type Line = { key: number; mdg_code: string; qty: string };
 
-function SubmitButton() {
+function SubmitButton({ canEdit }: { canEdit: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" disabled={!canEdit || pending}>
       {pending ? "등록 중…" : "출고 등록"}
     </Button>
   );
@@ -36,7 +36,7 @@ function parseBulk(text: string): { mdg_code: string; qty: string }[] {
     .filter((p) => p.mdg_code);
 }
 
-export function IssueForm() {
+export function IssueForm({ canEdit }: { canEdit: boolean }) {
   const [state, formAction] = useActionState(createIssue, initialFormState);
   const formRef = useRef<HTMLFormElement>(null);
   const nextKey = useRef(1);
@@ -75,11 +75,22 @@ export function IssueForm() {
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-5">
+      {!canEdit ? (
+        <p className="text-sm text-muted-foreground">
+          조회 전용 계정입니다. 수정 권한이 없습니다.
+        </p>
+      ) : null}
       {/* 출고 헤더 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="req_no">청구번호 *</Label>
-          <Input id="req_no" name="req_no" placeholder="REQ-2026-0001" required />
+          <Input
+            id="req_no"
+            name="req_no"
+            placeholder="REQ-2026-0001"
+            required
+            disabled={!canEdit}
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="issue_date">출고일 *</Label>
@@ -89,19 +100,20 @@ export function IssueForm() {
             type="date"
             defaultValue={today()}
             required
+            disabled={!canEdit}
           />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="tool_name">장비명</Label>
-          <Input id="tool_name" name="tool_name" placeholder="선택" />
+          <Input id="tool_name" name="tool_name" placeholder="선택" disabled={!canEdit} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="staff">담당자</Label>
-          <Input id="staff" name="staff" placeholder="선택" />
+          <Input id="staff" name="staff" placeholder="선택" disabled={!canEdit} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="remark">비고</Label>
-          <Input id="remark" name="remark" placeholder="선택" />
+          <Input id="remark" name="remark" placeholder="선택" disabled={!canEdit} />
         </div>
       </div>
 
@@ -128,6 +140,7 @@ export function IssueForm() {
           rows={3}
           placeholder={"엑셀에서 MDG코드·수량 두 열을 복사해 붙여넣으세요.\n예)\n536691\t3\n537161\t5"}
           className="font-mono text-xs"
+          disabled={!canEdit}
         />
         <div className="flex items-center gap-2">
           <Button
@@ -135,7 +148,7 @@ export function IssueForm() {
             variant="outline"
             size="sm"
             onClick={() => applyRows(parseBulk(bulk))}
-            disabled={!bulk.trim()}
+            disabled={!canEdit || !bulk.trim()}
           >
             붙여넣은 내용 적용
           </Button>
@@ -157,7 +170,13 @@ export function IssueForm() {
           <span className="text-sm font-medium">
             품목 (MDG코드) · {lines.length}건
           </span>
-          <Button type="button" variant="outline" size="sm" onClick={addLine}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addLine}
+            disabled={!canEdit}
+          >
             + 품목 추가
           </Button>
         </div>
@@ -172,6 +191,7 @@ export function IssueForm() {
                   onChange={(e) => setLine(l.key, "mdg_code", e.target.value)}
                   placeholder="예: 536691"
                   aria-label="MDG코드"
+                  disabled={!canEdit}
                 />
               </div>
               <div className="flex w-32 flex-col gap-1.5">
@@ -184,6 +204,7 @@ export function IssueForm() {
                   value={l.qty}
                   onChange={(e) => setLine(l.key, "qty", e.target.value)}
                   aria-label="출고수량"
+                  disabled={!canEdit}
                 />
               </div>
               <Button
@@ -191,7 +212,7 @@ export function IssueForm() {
                 variant="ghost"
                 size="sm"
                 onClick={() => removeLine(l.key)}
-                disabled={lines.length === 1}
+                disabled={!canEdit || lines.length === 1}
                 aria-label="품목 삭제"
                 className="text-muted-foreground"
               >
@@ -214,7 +235,7 @@ export function IssueForm() {
       ) : null}
 
       <div>
-        <SubmitButton />
+        <SubmitButton canEdit={canEdit} />
       </div>
     </form>
   );

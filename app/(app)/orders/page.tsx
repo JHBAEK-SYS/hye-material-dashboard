@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getCanEdit } from "@/lib/auth/editor";
 import { receiptStatus, remainingQty } from "@/lib/receive/validate";
 import { getPurchaseOrders } from "@/lib/supabase/queries";
 
@@ -34,6 +35,7 @@ export default async function OrdersPage({
   const page = Number(sp.page) > 0 ? Number(sp.page) : 1;
 
   const result = await getPurchaseOrders({ search, openOnly, page });
+  const canEdit = await getCanEdit();
 
   const buildHref = (nextPage: number) => {
     const params = new URLSearchParams();
@@ -71,7 +73,7 @@ export default async function OrdersPage({
           + 신규 발주 등록
         </summary>
         <div className="border-t p-4">
-          <OrderForm />
+          <OrderForm canEdit={canEdit} />
         </div>
       </details>
 
@@ -174,6 +176,7 @@ export default async function OrdersPage({
                             id={row.id}
                             defaultQty={remaining}
                             defaultRemark={row.remark}
+                            canEdit={canEdit}
                           />
                         </div>
                       ) : (
@@ -181,11 +184,12 @@ export default async function OrdersPage({
                           id={row.id}
                           defaultQty={remaining}
                           defaultRemark={row.remark}
+                          canEdit={canEdit}
                         />
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <DeleteButton id={row.id} label={row.po_no} />
+                      <DeleteButton id={row.id} label={row.po_no} canEdit={canEdit} />
                     </TableCell>
                   </TableRow>
                 );

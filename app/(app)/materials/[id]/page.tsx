@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getCanEdit } from "@/lib/auth/editor";
 import { getMaterialById } from "@/lib/supabase/queries";
 
 function num(v: number | null): string {
@@ -37,6 +38,7 @@ export default async function MaterialDetailPage({
   if (!detail) notFound();
 
   const { material, stock } = detail;
+  const canEdit = await getCanEdit();
 
   const facts: { label: string; value: React.ReactNode }[] = [
     { label: "MDG코드", value: material.mdg_code ?? "-" },
@@ -105,7 +107,7 @@ export default async function MaterialDetailPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <EditForm material={material} />
+          <EditForm material={material} canEdit={canEdit} />
         </CardContent>
       </Card>
 
@@ -122,6 +124,7 @@ export default async function MaterialDetailPage({
           <DeleteMaterialButton
             id={material.id}
             label={material.mdg_code ?? String(material.id)}
+            canEdit={canEdit}
           />
         </CardContent>
       </Card>

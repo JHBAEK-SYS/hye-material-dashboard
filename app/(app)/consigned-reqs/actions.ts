@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getCanEdit } from "@/lib/auth/editor";
 import {
   validateBlNoUpdate,
   validateConsignedReqHeader,
@@ -23,6 +24,10 @@ export async function createConsignedReq(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
+  if (!(await getCanEdit())) {
+    return { error: "수정 권한이 없습니다. 관리자에게 문의하세요.", message: null };
+  }
+
   const sg_no = String(formData.get("sg_no") ?? "").trim();
   const request_date = String(formData.get("request_date") ?? "").trim();
   const remark = String(formData.get("remark") ?? "").trim() || null;
@@ -117,6 +122,10 @@ export async function receiveConsignedReq(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
+  if (!(await getCanEdit())) {
+    return { error: "수정 권한이 없습니다. 관리자에게 문의하세요.", message: null };
+  }
+
   const id = Number(formData.get("id"));
   const received_date = String(formData.get("received_date") ?? "").trim();
   const received_qty = String(formData.get("received_qty") ?? "").trim();
@@ -180,6 +189,10 @@ export async function updateConsignedReqBlNo(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
+  if (!(await getCanEdit())) {
+    return { error: "수정 권한이 없습니다. 관리자에게 문의하세요.", message: null };
+  }
+
   const id = Number(formData.get("id"));
   const bl_no = String(formData.get("bl_no") ?? "").trim();
 
@@ -213,6 +226,10 @@ export async function deleteConsignedReq(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
+  if (!(await getCanEdit())) {
+    return { error: "수정 권한이 없습니다. 관리자에게 문의하세요.", message: null };
+  }
+
   const id = Number(formData.get("id"));
   if (!Number.isFinite(id) || id <= 0) {
     return { error: "잘못된 사급청구 ID.", message: null };

@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getCanEdit } from "@/lib/auth/editor";
 import { receiptStatus, remainingQty } from "@/lib/receive/validate";
 import { getConsignedReqs } from "@/lib/supabase/queries";
 
@@ -35,6 +36,7 @@ export default async function ConsignedReqsPage({
   const page = Number(sp.page) > 0 ? Number(sp.page) : 1;
 
   const result = await getConsignedReqs({ search, openOnly, page });
+  const canEdit = await getCanEdit();
 
   const buildHref = (nextPage: number) => {
     const params = new URLSearchParams();
@@ -72,7 +74,7 @@ export default async function ConsignedReqsPage({
           + 신규 사급청구 등록
         </summary>
         <div className="border-t p-4">
-          <ConsignedReqForm />
+          <ConsignedReqForm canEdit={canEdit} />
         </div>
       </details>
 
@@ -148,7 +150,11 @@ export default async function ConsignedReqsPage({
                   <TableRow key={row.id}>
                     <TableCell className="font-medium">{row.sg_no}</TableCell>
                     <TableCell>
-                      <BlNoForm id={row.id} defaultBlNo={row.bl_no} />
+                      <BlNoForm
+                        id={row.id}
+                        defaultBlNo={row.bl_no}
+                        canEdit={canEdit}
+                      />
                     </TableCell>
                     <TableCell>{row.request_date}</TableCell>
                     <TableCell className="max-w-56 truncate">
@@ -177,6 +183,7 @@ export default async function ConsignedReqsPage({
                             id={row.id}
                             defaultQty={remaining}
                             defaultRemark={row.remark}
+                            canEdit={canEdit}
                           />
                         </div>
                       ) : (
@@ -184,11 +191,12 @@ export default async function ConsignedReqsPage({
                           id={row.id}
                           defaultQty={remaining}
                           defaultRemark={row.remark}
+                          canEdit={canEdit}
                         />
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <DeleteButton id={row.id} label={row.sg_no} />
+                      <DeleteButton id={row.id} label={row.sg_no} canEdit={canEdit} />
                     </TableCell>
                   </TableRow>
                 );

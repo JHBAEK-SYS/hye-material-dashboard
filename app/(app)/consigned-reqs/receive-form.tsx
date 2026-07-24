@@ -8,10 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { initialFormState } from "@/lib/form-state";
 
-function Btn() {
+function Btn({ canEdit }: { canEdit: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="outline" disabled={pending}>
+    <Button
+      type="submit"
+      size="sm"
+      variant="outline"
+      disabled={!canEdit || pending}
+      title={canEdit ? undefined : "수정 권한이 없습니다"}
+    >
       {pending ? "…" : "입고"}
     </Button>
   );
@@ -24,10 +30,12 @@ export function ReceiveForm({
   id,
   defaultQty,
   defaultRemark,
+  canEdit,
 }: {
   id: number;
   defaultQty: number;
   defaultRemark: string | null;
+  canEdit: boolean;
 }) {
   const [state, formAction] = useActionState(
     receiveConsignedReq,
@@ -44,6 +52,7 @@ export function ReceiveForm({
         defaultValue={defaultQty}
         className="h-8 w-20"
         aria-label="입고수량"
+        disabled={!canEdit}
       />
       <Input
         name="received_date"
@@ -51,6 +60,7 @@ export function ReceiveForm({
         defaultValue={today()}
         className="h-8 w-36"
         aria-label="입고일"
+        disabled={!canEdit}
       />
       <Input
         name="remark"
@@ -59,8 +69,9 @@ export function ReceiveForm({
         placeholder="비고 (예: 1차 1/3 20개)"
         className="h-8 w-40"
         aria-label="비고"
+        disabled={!canEdit}
       />
-      <Btn />
+      <Btn canEdit={canEdit} />
       {state.error ? (
         <span className="text-xs text-destructive">{state.error}</span>
       ) : null}

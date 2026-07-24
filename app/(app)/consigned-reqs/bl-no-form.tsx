@@ -8,10 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { initialFormState } from "@/lib/form-state";
 
-function Btn() {
+function Btn({ canEdit }: { canEdit: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="outline" disabled={pending}>
+    <Button
+      type="submit"
+      size="sm"
+      variant="outline"
+      disabled={!canEdit || pending}
+      title={canEdit ? undefined : "수정 권한이 없습니다"}
+    >
       {pending ? "…" : "저장"}
     </Button>
   );
@@ -24,9 +30,11 @@ function Btn() {
 export function BlNoForm({
   id,
   defaultBlNo,
+  canEdit,
 }: {
   id: number;
   defaultBlNo: string | null;
+  canEdit: boolean;
 }) {
   const [state, formAction] = useActionState(
     updateConsignedReqBlNo,
@@ -42,8 +50,9 @@ export function BlNoForm({
         placeholder="B/L NO"
         className="h-8 w-32"
         aria-label="B/L NO"
+        disabled={!canEdit}
       />
-      <Btn />
+      <Btn canEdit={canEdit} />
       {state.error ? (
         <span className="text-xs text-destructive">{state.error}</span>
       ) : null}

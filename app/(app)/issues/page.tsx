@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getCanEdit } from "@/lib/auth/editor";
 import { getIssues } from "@/lib/supabase/queries";
 
 type SearchParams = Promise<{ q?: string; page?: string }>;
@@ -30,6 +31,7 @@ export default async function IssuesPage({
   const page = Number(sp.page) > 0 ? Number(sp.page) : 1;
 
   const result = await getIssues({ search, page });
+  const canEdit = await getCanEdit();
 
   const buildHref = (nextPage: number) => {
     const params = new URLSearchParams();
@@ -65,7 +67,7 @@ export default async function IssuesPage({
           + 신규 출고 등록
         </summary>
         <div className="border-t p-4">
-          <IssueForm />
+          <IssueForm canEdit={canEdit} />
         </div>
       </details>
 
@@ -135,7 +137,7 @@ export default async function IssuesPage({
                   <TableCell>{row.tool_name ?? "-"}</TableCell>
                   <TableCell>{row.staff ?? "-"}</TableCell>
                   <TableCell className="text-right">
-                    <DeleteButton id={row.id} label={row.req_no} />
+                    <DeleteButton id={row.id} label={row.req_no} canEdit={canEdit} />
                   </TableCell>
                 </TableRow>
               ))

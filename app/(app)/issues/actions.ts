@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getCanEdit } from "@/lib/auth/editor";
 import {
   validateDeleteId,
   validateIssueHeader,
@@ -18,6 +19,10 @@ export async function createIssue(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
+  if (!(await getCanEdit())) {
+    return { error: "수정 권한이 없습니다. 관리자에게 문의하세요.", message: null };
+  }
+
   const req_no = String(formData.get("req_no") ?? "").trim();
   const issue_date = String(formData.get("issue_date") ?? "").trim();
   const tool_name = String(formData.get("tool_name") ?? "").trim() || null;
@@ -100,6 +105,10 @@ export async function deleteIssue(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
+  if (!(await getCanEdit())) {
+    return { error: "수정 권한이 없습니다. 관리자에게 문의하세요.", message: null };
+  }
+
   const id = Number(formData.get("id"));
   const idError = validateDeleteId(id);
   if (idError) {

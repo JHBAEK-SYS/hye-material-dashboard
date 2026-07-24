@@ -7,14 +7,15 @@ import { deleteMaterial } from "@/app/(app)/materials/actions";
 import { Button } from "@/components/ui/button";
 import { initialFormState } from "@/lib/form-state";
 
-function Btn() {
+function Btn({ canEdit }: { canEdit: boolean }) {
   const { pending } = useFormStatus();
   return (
     <Button
       type="submit"
       variant="outline"
       size="sm"
-      disabled={pending}
+      disabled={!canEdit || pending}
+      title={canEdit ? undefined : "수정 권한이 없습니다"}
       className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
     >
       {pending ? "삭제 중…" : "자재 삭제"}
@@ -25,9 +26,11 @@ function Btn() {
 export function DeleteMaterialButton({
   id,
   label,
+  canEdit,
 }: {
   id: number;
   label: string;
+  canEdit: boolean;
 }) {
   const [state, formAction] = useActionState(deleteMaterial, initialFormState);
   return (
@@ -41,7 +44,7 @@ export function DeleteMaterialButton({
       className="flex items-center gap-3"
     >
       <input type="hidden" name="id" value={id} />
-      <Btn />
+      <Btn canEdit={canEdit} />
       {state.error ? (
         <span className="text-sm text-destructive" role="alert">
           {state.error}

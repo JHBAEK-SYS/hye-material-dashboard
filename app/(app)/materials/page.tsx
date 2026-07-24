@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getCanEdit } from "@/lib/auth/editor";
 import { getMaterials } from "@/lib/supabase/queries";
 import { STOCK_STATUSES, type StockStatus } from "@/types/database";
 
@@ -40,6 +41,7 @@ export default async function MaterialsPage({
   const page = Number(sp.page) > 0 ? Number(sp.page) : 1;
 
   const result = await getMaterials({ search, status, activeOnly, page });
+  const canEdit = await getCanEdit();
 
   const buildHref = (nextPage: number) => {
     const params = new URLSearchParams();
@@ -82,7 +84,7 @@ export default async function MaterialsPage({
           + 신규 자재 등록
         </summary>
         <div className="border-t p-4">
-          <MaterialForm />
+          <MaterialForm canEdit={canEdit} />
         </div>
       </details>
 

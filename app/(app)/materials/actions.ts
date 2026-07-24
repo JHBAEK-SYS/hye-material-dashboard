@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { getCanEdit } from "@/lib/auth/editor";
 import { validateNewMaterial } from "@/lib/materials/validate";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "@/lib/form-state";
@@ -17,6 +18,10 @@ export async function createMaterial(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
+  if (!(await getCanEdit())) {
+    return { error: "수정 권한이 없습니다. 관리자에게 문의하세요.", message: null };
+  }
+
   const str = (k: string) => {
     const v = String(formData.get(k) ?? "").trim();
     return v === "" ? null : v;
@@ -90,6 +95,10 @@ export async function deleteMaterial(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
+  if (!(await getCanEdit())) {
+    return { error: "수정 권한이 없습니다. 관리자에게 문의하세요.", message: null };
+  }
+
   const id = Number(formData.get("id"));
   if (!Number.isFinite(id) || !Number.isInteger(id) || id <= 0) {
     return { error: "잘못된 자재 ID 입니다.", message: null };

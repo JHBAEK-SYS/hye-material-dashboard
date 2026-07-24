@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getCanEdit } from "@/lib/auth/editor";
 import {
   receiptStatus,
   remainingQty,
@@ -18,6 +19,10 @@ export async function createPurchaseOrder(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
+  if (!(await getCanEdit())) {
+    return { error: "수정 권한이 없습니다. 관리자에게 문의하세요.", message: null };
+  }
+
   const po_no = String(formData.get("po_no") ?? "").trim();
   const order_date = String(formData.get("order_date") ?? "").trim();
   const vendor = String(formData.get("vendor") ?? "").trim();
@@ -121,6 +126,10 @@ export async function receivePurchaseOrder(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
+  if (!(await getCanEdit())) {
+    return { error: "수정 권한이 없습니다. 관리자에게 문의하세요.", message: null };
+  }
+
   const id = Number(formData.get("id"));
   const received_date = String(formData.get("received_date") ?? "").trim();
   const received_qty = String(formData.get("received_qty") ?? "").trim();
@@ -180,6 +189,10 @@ export async function deletePurchaseOrder(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
+  if (!(await getCanEdit())) {
+    return { error: "수정 권한이 없습니다. 관리자에게 문의하세요.", message: null };
+  }
+
   const id = Number(formData.get("id"));
   if (!Number.isFinite(id) || id <= 0) {
     return { error: "잘못된 발주 ID.", message: null };

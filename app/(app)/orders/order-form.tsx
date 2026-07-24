@@ -12,10 +12,10 @@ import { initialFormState } from "@/lib/form-state";
 
 type Line = { key: number; mdg_code: string; qty: string };
 
-function SubmitButton() {
+function SubmitButton({ canEdit }: { canEdit: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" disabled={!canEdit || pending}>
       {pending ? "등록 중…" : "발주 등록"}
     </Button>
   );
@@ -36,7 +36,7 @@ function parseBulk(text: string): { mdg_code: string; qty: string }[] {
     .filter((p) => p.mdg_code);
 }
 
-export function OrderForm() {
+export function OrderForm({ canEdit }: { canEdit: boolean }) {
   const [state, formAction] = useActionState(
     createPurchaseOrder,
     initialFormState
@@ -78,11 +78,22 @@ export function OrderForm() {
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-5">
+      {!canEdit ? (
+        <p className="text-sm text-muted-foreground">
+          조회 전용 계정입니다. 수정 권한이 없습니다.
+        </p>
+      ) : null}
       {/* 발주 헤더 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="po_no">발주번호 *</Label>
-          <Input id="po_no" name="po_no" placeholder="PO-2026-0001" required />
+          <Input
+            id="po_no"
+            name="po_no"
+            placeholder="PO-2026-0001"
+            required
+            disabled={!canEdit}
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="order_date">발주일 *</Label>
@@ -92,15 +103,22 @@ export function OrderForm() {
             type="date"
             defaultValue={today()}
             required
+            disabled={!canEdit}
           />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="vendor">거래처 *</Label>
-          <Input id="vendor" name="vendor" placeholder="공급업체명" required />
+          <Input
+            id="vendor"
+            name="vendor"
+            placeholder="공급업체명"
+            required
+            disabled={!canEdit}
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="remark">비고</Label>
-          <Input id="remark" name="remark" placeholder="선택" />
+          <Input id="remark" name="remark" placeholder="선택" disabled={!canEdit} />
         </div>
       </div>
 
@@ -127,6 +145,7 @@ export function OrderForm() {
           rows={3}
           placeholder={"엑셀에서 MDG코드·수량 두 열을 복사해 붙여넣으세요.\n예)\n536691\t3\n537161\t5"}
           className="font-mono text-xs"
+          disabled={!canEdit}
         />
         <div className="flex items-center gap-2">
           <Button
@@ -134,7 +153,7 @@ export function OrderForm() {
             variant="outline"
             size="sm"
             onClick={() => applyRows(parseBulk(bulk))}
-            disabled={!bulk.trim()}
+            disabled={!canEdit || !bulk.trim()}
           >
             붙여넣은 내용 적용
           </Button>
@@ -156,7 +175,13 @@ export function OrderForm() {
           <span className="text-sm font-medium">
             품목 (MDG코드) · {lines.length}건
           </span>
-          <Button type="button" variant="outline" size="sm" onClick={addLine}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addLine}
+            disabled={!canEdit}
+          >
             + 품목 추가
           </Button>
         </div>
@@ -171,6 +196,7 @@ export function OrderForm() {
                   onChange={(e) => setLine(l.key, "mdg_code", e.target.value)}
                   placeholder="예: 536691"
                   aria-label="MDG코드"
+                  disabled={!canEdit}
                 />
               </div>
               <div className="flex w-32 flex-col gap-1.5">
@@ -183,6 +209,7 @@ export function OrderForm() {
                   value={l.qty}
                   onChange={(e) => setLine(l.key, "qty", e.target.value)}
                   aria-label="발주수량"
+                  disabled={!canEdit}
                 />
               </div>
               <Button
@@ -190,7 +217,7 @@ export function OrderForm() {
                 variant="ghost"
                 size="sm"
                 onClick={() => removeLine(l.key)}
-                disabled={lines.length === 1}
+                disabled={!canEdit || lines.length === 1}
                 aria-label="품목 삭제"
                 className="text-muted-foreground"
               >
@@ -213,7 +240,7 @@ export function OrderForm() {
       ) : null}
 
       <div>
-        <SubmitButton />
+        <SubmitButton canEdit={canEdit} />
       </div>
     </form>
   );
