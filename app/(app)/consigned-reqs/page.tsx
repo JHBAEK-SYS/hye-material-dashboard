@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { BlNoForm } from "@/app/(app)/consigned-reqs/bl-no-form";
 import { ConsignedReqForm } from "@/app/(app)/consigned-reqs/consigned-req-form";
 import { DeleteButton } from "@/app/(app)/consigned-reqs/delete-button";
 import { ReceiveForm } from "@/app/(app)/consigned-reqs/receive-form";
@@ -89,7 +90,7 @@ export default async function ConsignedReqsPage({
             id="q"
             name="q"
             defaultValue={search}
-            placeholder="사급청구번호"
+            placeholder="사급청구번호 · B/L NO · MDG코드 · Part No"
           />
         </div>
         <label
@@ -120,6 +121,7 @@ export default async function ConsignedReqsPage({
           <TableHeader>
             <TableRow>
               <TableHead>사급청구번호</TableHead>
+              <TableHead>B/L NO</TableHead>
               <TableHead>요청일</TableHead>
               <TableHead>자재</TableHead>
               <TableHead className="text-right">요청수량</TableHead>
@@ -133,7 +135,7 @@ export default async function ConsignedReqsPage({
               <TableRow>
                 <TableCell
                   className="h-24 text-center text-muted-foreground"
-                  colSpan={7}
+                  colSpan={8}
                 >
                   사급청구 내역이 없습니다. 위 &ldquo;신규 사급청구 등록&rdquo;으로 추가하세요.
                 </TableCell>
@@ -145,6 +147,9 @@ export default async function ConsignedReqsPage({
                 return (
                   <TableRow key={row.id}>
                     <TableCell className="font-medium">{row.sg_no}</TableCell>
+                    <TableCell>
+                      <BlNoForm id={row.id} defaultBlNo={row.bl_no} />
+                    </TableCell>
                     <TableCell>{row.request_date}</TableCell>
                     <TableCell className="max-w-56 truncate">
                       {row.material

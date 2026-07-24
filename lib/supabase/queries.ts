@@ -374,6 +374,53 @@ export async function getIssues(params: {
   };
 }
 
+// ---------------------------------------------------------------------------
+// 사급청구 검색: 사급청구번호(sg_no) · B/L NO(bl_no) · MDG코드/Part No 통합 검색
+//
+// mdg_code/part_no는 materials 테이블에 있고, 이 프로젝트는 FK 임베딩 대신
+// attachMaterials()로 수동 조인한다. PostgREST는 한 번의 .or() 안에서 다른
+// 테이블의 컬럼을 참조할 수 없으므로, 검색어로 materials에서 먼저 매칭되는
+// id 목록을 구한 뒤 consigned_reqs 쪽 OR 조건에 material_id.in.(...)로 끼워
+// 넣는 2단계 조회로 구현한다.
+// ---------------------------------------------------------------------------
+
+const MATERIAL_MATCH_ID_LIMIT = 300;
+
+/**
+ * 검색어로 materials에서 mdg_code/part_no 부분일치하는 id 목록을 조회한다.
+ *
+ * 상한(300건) 한계: 흔한 부분 문자열로 검색하면 수백~수천 개의 id가 매칭될 수
+ * 있는데, 이를 모두 `material_id.in.(1,2,3,...)` 쿼리스트링에 담으면 URL이
+ * 과도하게 길어지거나 요청이 비효율적으로 커진다. 300건으로 제한했기 때문에
+ * 매칭 id가 300개를 초과하는 검색어의 경우, 301번째 이후의 material_id를 가진
+ * consigned_reqs 행은 검색 결과에서 누락될 수 있다(자재 마스터가 훨씬 커지면
+ * 전용 검색 인덱스/뷰로 옮겨야 한다).
+ */
+async function findMatchingMaterialIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  term: string
+): Promise<number[]> {
+  const { data } = await supabase
+    .from("materials")
+    .select("id")
+    .or(`mdg_code.ilike.%${term}%,part_no.ilike.%${term}%`)
+    .limit(MATERIAL_MATCH_ID_LIMIT);
+  return ((data ?? []) as { id: number }[]).map((m) => m.id);
+}
+
+/**
+ * consigned_reqs .or() 조건 문자열 조립: sg_no/bl_no 부분일치 OR 매칭된 material_id.
+ * matchedIds가 비어 있으면 `material_id.in.()` 은 문법 오류가 날 수 있어 생략한다
+ * (이 경우 sg_no/bl_no 조건만으로 검색).
+ */
+function buildConsignedReqsSearchOr(term: string, matchedIds: number[]): string {
+  const parts = [`sg_no.ilike.%${term}%`, `bl_no.ilike.%${term}%`];
+  if (matchedIds.length > 0) {
+    parts.push(`material_id.in.(${matchedIds.join(",")})`);
+  }
+  return parts.join(",");
+}
+
 export interface ConsignedReqResult {
   rows: ConsignedReqRow[];
   count: number;
@@ -404,13 +451,17 @@ export async function getConsignedReqs(params: {
   const from = (page - 1) * LEDGER_PAGE_SIZE;
   const to = from + LEDGER_PAGE_SIZE - 1;
 
+  const term = params.search?.trim()
+    ? params.search.trim().replace(/[%,()]/g, " ")
+    : "";
+  const matchedIds = term ? await findMatchingMaterialIds(supabase, term) : [];
+
   const buildBase = (withCount: boolean) => {
     let query = withCount
       ? supabase.from("consigned_reqs").select("*", { count: "exact" })
       : supabase.from("consigned_reqs").select("*");
-    if (params.search?.trim()) {
-      const term = params.search.trim().replace(/[%,()]/g, " ");
-      query = query.or(`sg_no.ilike.%${term}%`);
+    if (term) {
+      query = query.or(buildConsignedReqsSearchOr(term, matchedIds));
     }
     return query
       .order("request_date", { ascending: false })
@@ -597,11 +648,15 @@ export async function getAllConsignedReqsForExport(
 ): Promise<ConsignedReqRow[]> {
   const supabase = await createClient();
 
+  const term = params.search?.trim()
+    ? params.search.trim().replace(/[%,()]/g, " ")
+    : "";
+  const matchedIds = term ? await findMatchingMaterialIds(supabase, term) : [];
+
   const buildBase = () => {
     let query = supabase.from("consigned_reqs").select("*");
-    if (params.search?.trim()) {
-      const term = params.search.trim().replace(/[%,()]/g, " ");
-      query = query.or(`sg_no.ilike.%${term}%`);
+    if (term) {
+      query = query.or(buildConsignedReqsSearchOr(term, matchedIds));
     }
     return query
       .order("request_date", { ascending: false })

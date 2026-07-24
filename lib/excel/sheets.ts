@@ -95,6 +95,7 @@ export function purchaseOrdersSheet(rows: PurchaseOrderRow[]): SheetSpec {
 export function consignedReqsSheet(rows: ConsignedReqRow[]): SheetSpec {
   const columns: SheetSpec["columns"] = [
     { header: "사급청구번호", width: 18 },
+    { header: "B/L NO", width: 16 },
     { header: "요청일", width: 12 },
     { header: "MDG코드", width: 14 },
     { header: "자재명", width: 32 },
@@ -106,6 +107,7 @@ export function consignedReqsSheet(rows: ConsignedReqRow[]): SheetSpec {
 
   const dataRows = rows.map((row) => [
     cell(row.sg_no),
+    cell(row.bl_no),
     cell(row.request_date),
     cell(row.material?.mdg_code),
     cell(row.material?.material_name),

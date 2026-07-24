@@ -21,7 +21,7 @@ export function validateConsignedReqHeader(input: {
 }
 
 export function validateConsignedReqLines(
-  lines: { mdg_code: string; qty: string }[]
+  lines: { mdg_code: string; qty: string; bl_no?: string }[]
 ): string | null {
   if (lines.length === 0) {
     return "품목(MDG코드)을 1개 이상 입력하세요.";
@@ -41,10 +41,38 @@ export function validateConsignedReqLines(
       return `'${mdg_code}' 품목의 수량이 올바르지 않습니다.`;
     }
 
+    // bl_no(B/L NO)는 선택 입력 — 선적 시점에 나오므로 청구 등록 시점엔 없을 수 있다.
+    // 값이 있든 없든 여기서는 검증하지 않는다(별도 길이 검증은 validateBlNoUpdate 참고).
+
     if (seen.has(mdg_code)) {
       return `같은 사급청구에 중복된 품목: ${mdg_code}`;
     }
     seen.add(mdg_code);
+  }
+
+  return null;
+}
+
+const BL_NO_MAX_LENGTH = 100;
+
+/**
+ * B/L NO 수정(목록 인라인 폼) 입력 검증.
+ * id는 유한한 양의 정수여야 하고, bl_no는 빈 값(=지우기)을 허용하되 길이 상한만 둔다.
+ */
+export function validateBlNoUpdate(input: {
+  id: number;
+  bl_no: string;
+}): string | null {
+  if (
+    !Number.isFinite(input.id) ||
+    !Number.isInteger(input.id) ||
+    input.id <= 0
+  ) {
+    return "잘못된 ID 입니다.";
+  }
+
+  if (input.bl_no.trim().length > BL_NO_MAX_LENGTH) {
+    return `B/L NO는 ${BL_NO_MAX_LENGTH}자를 초과할 수 없습니다.`;
   }
 
   return null;

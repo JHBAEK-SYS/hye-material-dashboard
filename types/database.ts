@@ -79,6 +79,7 @@ export interface ConsignedReqRow {
   received_date: string | null;
   received_qty: number | null;
   remark: string | null;
+  bl_no: string | null;
   created_by: string | null;
   created_at: string | null;
   updated_at: string | null;

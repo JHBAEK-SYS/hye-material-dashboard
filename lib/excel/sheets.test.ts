@@ -193,6 +193,7 @@ describe("consignedReqsSheet", () => {
     received_date: null,
     received_qty: null,
     remark: null,
+    bl_no: "BL-2026-001",
     created_by: null,
     created_at: null,
     updated_at: null,
@@ -209,6 +210,7 @@ describe("consignedReqsSheet", () => {
     const spec = consignedReqsSheet([baseRow]);
     expect(spec.columns.map((c) => c.header)).toEqual([
       "사급청구번호",
+      "B/L NO",
       "요청일",
       "MDG코드",
       "자재명",
@@ -217,6 +219,18 @@ describe("consignedReqsSheet", () => {
       "입고일",
       "비고",
     ]);
+  });
+
+  it("B/L NO 값이 그대로 들어간다", () => {
+    const spec = consignedReqsSheet([baseRow]);
+    const blIdx = spec.columns.findIndex((c) => c.header === "B/L NO");
+    expect(spec.rows[0][blIdx]).toBe("BL-2026-001");
+  });
+
+  it("B/L NO가 null이면 null로 처리된다", () => {
+    const spec = consignedReqsSheet([{ ...baseRow, bl_no: null }]);
+    const blIdx = spec.columns.findIndex((c) => c.header === "B/L NO");
+    expect(spec.rows[0][blIdx]).toBeNull();
   });
 
   it("헤더 개수와 행의 열 개수가 일치한다", () => {

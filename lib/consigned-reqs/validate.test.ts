@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  validateBlNoUpdate,
   validateConsignedReqHeader,
   validateConsignedReqLines,
 } from "@/lib/consigned-reqs/validate";
@@ -115,5 +116,70 @@ describe("validateConsignedReqLines", () => {
         { mdg_code: "538000", qty: "1.5" },
       ])
     ).toBeNull();
+  });
+
+  it("bl_no가 없어도(undefined) 에러가 아니다 — 선택 입력", () => {
+    expect(
+      validateConsignedReqLines([{ mdg_code: "536691", qty: "10" }])
+    ).toBeNull();
+  });
+
+  it("bl_no가 빈 문자열이어도 에러가 아니다", () => {
+    expect(
+      validateConsignedReqLines([
+        { mdg_code: "536691", qty: "10", bl_no: "" },
+      ])
+    ).toBeNull();
+  });
+
+  it("bl_no가 값이 있어도 정상 처리된다", () => {
+    expect(
+      validateConsignedReqLines([
+        { mdg_code: "536691", qty: "10", bl_no: "BL-2026-001" },
+      ])
+    ).toBeNull();
+  });
+
+  it("bl_no가 달라도 같은 mdg_code가 중복이면 여전히 에러를 반환한다", () => {
+    const result = validateConsignedReqLines([
+      { mdg_code: "536691", qty: "10", bl_no: "BL-001" },
+      { mdg_code: "536691", qty: "5", bl_no: "BL-002" },
+    ]);
+    expect(result).not.toBeNull();
+    expect(result).toContain("536691");
+  });
+});
+
+describe("validateBlNoUpdate", () => {
+  it("정상 입력이면 null을 반환한다", () => {
+    expect(validateBlNoUpdate({ id: 1, bl_no: "BL-2026-001" })).toBeNull();
+  });
+
+  it("bl_no가 빈 문자열이면 허용된다 (지우기 용도)", () => {
+    expect(validateBlNoUpdate({ id: 1, bl_no: "" })).toBeNull();
+  });
+
+  it("id가 정수가 아니면 에러를 반환한다", () => {
+    expect(validateBlNoUpdate({ id: 1.5, bl_no: "BL-001" })).not.toBeNull();
+  });
+
+  it("id가 0 이하이면 에러를 반환한다", () => {
+    expect(validateBlNoUpdate({ id: 0, bl_no: "BL-001" })).not.toBeNull();
+    expect(validateBlNoUpdate({ id: -1, bl_no: "BL-001" })).not.toBeNull();
+  });
+
+  it("id가 NaN/Infinity이면 에러를 반환한다", () => {
+    expect(validateBlNoUpdate({ id: NaN, bl_no: "BL-001" })).not.toBeNull();
+    expect(validateBlNoUpdate({ id: Infinity, bl_no: "BL-001" })).not.toBeNull();
+  });
+
+  it("bl_no가 100자를 초과하면 에러를 반환한다", () => {
+    const long = "A".repeat(101);
+    expect(validateBlNoUpdate({ id: 1, bl_no: long })).not.toBeNull();
+  });
+
+  it("bl_no가 정확히 100자이면 허용된다", () => {
+    const exact = "A".repeat(100);
+    expect(validateBlNoUpdate({ id: 1, bl_no: exact })).toBeNull();
   });
 });

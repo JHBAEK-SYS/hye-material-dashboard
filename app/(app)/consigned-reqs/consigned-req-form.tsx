@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { parseBulk } from "@/lib/consigned-reqs/parse-bulk";
 import { initialFormState } from "@/lib/form-state";
 
-type Line = { key: number; mdg_code: string; qty: string };
+type Line = { key: number; mdg_code: string; qty: string; bl_no: string };
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -23,19 +24,6 @@ function SubmitButton() {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** 엑셀/텍스트 붙여넣기 파싱: 한 줄당 "MDG코드 [탭/공백/쉼표] 수량" */
-function parseBulk(text: string): { mdg_code: string; qty: string }[] {
-  return text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((l) => {
-      const parts = l.split(/[\s,]+/).filter(Boolean);
-      return { mdg_code: parts[0] ?? "", qty: parts[1] ?? "" };
-    })
-    .filter((p) => p.mdg_code);
-}
-
 export function ConsignedReqForm() {
   const [state, formAction] = useActionState(
     createConsignedReq,
@@ -44,7 +32,7 @@ export function ConsignedReqForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const nextKey = useRef(1);
   const [lines, setLines] = useState<Line[]>([
-    { key: 0, mdg_code: "", qty: "" },
+    { key: 0, mdg_code: "", qty: "", bl_no: "" },
   ]);
   const [bulk, setBulk] = useState("");
   const [applied, setApplied] = useState<number | null>(null);
@@ -52,7 +40,7 @@ export function ConsignedReqForm() {
   useEffect(() => {
     if (state.message) {
       formRef.current?.reset();
-      setLines([{ key: nextKey.current++, mdg_code: "", qty: "" }]);
+      setLines([{ key: nextKey.current++, mdg_code: "", qty: "", bl_no: "" }]);
       setBulk("");
       setApplied(null);
     }
@@ -61,16 +49,22 @@ export function ConsignedReqForm() {
   const addLine = () =>
     setLines((ls) => [
       ...ls,
-      { key: nextKey.current++, mdg_code: "", qty: "" },
+      { key: nextKey.current++, mdg_code: "", qty: "", bl_no: "" },
     ]);
   const removeLine = (key: number) =>
     setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
-  const setLine = (key: number, field: "mdg_code" | "qty", value: string) =>
+  const setLine = (
+    key: number,
+    field: "mdg_code" | "qty" | "bl_no",
+    value: string
+  ) =>
     setLines((ls) =>
       ls.map((l) => (l.key === key ? { ...l, [field]: value } : l))
     );
 
-  const applyRows = (rows: { mdg_code: string; qty: string }[]) => {
+  const applyRows = (
+    rows: { mdg_code: string; qty: string; bl_no: string }[]
+  ) => {
     if (rows.length === 0) return;
     setLines(rows.map((r) => ({ key: nextKey.current++, ...r })));
     setApplied(rows.length);
@@ -105,7 +99,7 @@ export function ConsignedReqForm() {
         <Label htmlFor="bulk">
           엑셀 붙여넣기{" "}
           <span className="font-normal text-muted-foreground">
-            (열 순서: MDG코드 · 수량 / 줄바꿈으로 여러 건)
+            (열 순서: MDG코드 · 수량 · B/L NO(선택) / 줄바꿈으로 여러 건)
           </span>
         </Label>
         <Textarea
@@ -121,7 +115,9 @@ export function ConsignedReqForm() {
             }
           }}
           rows={3}
-          placeholder={"엑셀에서 MDG코드·수량 두 열을 복사해 붙여넣으세요.\n예)\n536691\t3\n537161\t5"}
+          placeholder={
+            "엑셀에서 MDG코드·수량·B/L NO(선택) 열을 복사해 붙여넣으세요.\n예)\n536691\t3\tBL-2026-001\n537161\t5"
+          }
           className="font-mono text-xs"
         />
         <div className="flex items-center gap-2">
@@ -158,8 +154,8 @@ export function ConsignedReqForm() {
         </div>
         <div className="flex flex-col gap-2">
           {lines.map((l) => (
-            <div key={l.key} className="flex items-end gap-2">
-              <div className="flex flex-1 flex-col gap-1.5">
+            <div key={l.key} className="flex flex-wrap items-end gap-2">
+              <div className="flex min-w-40 flex-1 flex-col gap-1.5">
                 <Label className="text-xs text-muted-foreground">MDG코드 *</Label>
                 <Input
                   name="mdg_code"
@@ -179,6 +175,18 @@ export function ConsignedReqForm() {
                   value={l.qty}
                   onChange={(e) => setLine(l.key, "qty", e.target.value)}
                   aria-label="요청수량"
+                />
+              </div>
+              <div className="flex min-w-40 flex-1 flex-col gap-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  B/L NO
+                </Label>
+                <Input
+                  name="bl_no"
+                  value={l.bl_no}
+                  onChange={(e) => setLine(l.key, "bl_no", e.target.value)}
+                  placeholder="선택 · 선적 후 입력 가능"
+                  aria-label="B/L NO"
                 />
               </div>
               <Button

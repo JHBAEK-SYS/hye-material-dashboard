@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import {
+  validateBlNoUpdate,
   validateConsignedReqHeader,
   validateConsignedReqLines,
 } from "@/lib/consigned-reqs/validate";
@@ -28,18 +29,20 @@ export async function createConsignedReq(
 
   const mdgCodes = formData.getAll("mdg_code").map((v) => String(v).trim());
   const qtys = formData.getAll("qty").map((v) => String(v).trim());
+  const blNos = formData.getAll("bl_no").map((v) => String(v).trim());
 
   const headerError = validateConsignedReqHeader({ sg_no, request_date });
   if (headerError) {
     return { error: headerError, message: null };
   }
 
-  // 품목 줄 취합 (빈 줄 건너뜀)
-  const lines: { mdg_code: string; qty: string }[] = [];
+  // 품목 줄 취합 (빈 줄 건너뜀). mdg_code/qty/bl_no는 폼에서 같은 인덱스로 제출되므로
+  // 빈 줄을 건너뛰어도 i는 세 배열에서 동일한 인덱스를 가리켜야 어긋나지 않는다.
+  const lines: { mdg_code: string; qty: string; bl_no: string }[] = [];
   for (let i = 0; i < mdgCodes.length; i++) {
     const code = mdgCodes[i];
     if (!code) continue;
-    lines.push({ mdg_code: code, qty: qtys[i] ?? "" });
+    lines.push({ mdg_code: code, qty: qtys[i] ?? "", bl_no: blNos[i] ?? "" });
   }
 
   const linesError = validateConsignedReqLines(lines);
@@ -72,6 +75,7 @@ export async function createConsignedReq(
     material_id: map.get(l.mdg_code)!,
     request_qty: Number(l.qty),
     remark,
+    bl_no: l.bl_no || null,
   }));
 
   const { data, error } = await supabase
@@ -165,6 +169,43 @@ export async function receiveConsignedReq(
   revalidatePath("/consigned-reqs");
   revalidatePath("/dashboard");
   return { error: null, message };
+}
+
+/**
+ * 사급청구 품목(행)의 B/L NO 수정. 등록 시점엔 선적 전이라 B/L NO를 몰라 비워둘 수
+ * 있으므로, 목록에서 나중에 채우거나 고쳐 쓸 수 있게 하는 인라인 수정용 액션.
+ * bl_no가 빈 문자열이면 null로 저장(=지우기).
+ */
+export async function updateConsignedReqBlNo(
+  _prev: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const id = Number(formData.get("id"));
+  const bl_no = String(formData.get("bl_no") ?? "").trim();
+
+  const validationError = validateBlNoUpdate({ id, bl_no });
+  if (validationError) {
+    return { error: validationError, message: null };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("consigned_reqs")
+    .update({ bl_no: bl_no || null })
+    .eq("id", id)
+    .select();
+
+  if (error) return { error: `B/L NO 저장 실패: ${error.message}`, message: null };
+  if (!data || data.length === 0) {
+    return {
+      error:
+        "저장이 반영되지 않았습니다. consigned_reqs 테이블에 authenticated UPDATE 정책이 필요합니다.",
+      message: null,
+    };
+  }
+
+  revalidatePath("/consigned-reqs");
+  return { error: null, message: "B/L NO가 저장되었습니다." };
 }
 
 /** 사급청구 삭제 (실수 복구용) */
