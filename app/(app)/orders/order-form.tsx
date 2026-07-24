@@ -47,12 +47,14 @@ export function OrderForm() {
     { key: 0, mdg_code: "", qty: "" },
   ]);
   const [bulk, setBulk] = useState("");
+  const [applied, setApplied] = useState<number | null>(null);
 
   useEffect(() => {
     if (state.message) {
       formRef.current?.reset();
       setLines([{ key: nextKey.current++, mdg_code: "", qty: "" }]);
       setBulk("");
+      setApplied(null);
     }
   }, [state.message]);
 
@@ -71,6 +73,7 @@ export function OrderForm() {
   const applyRows = (rows: { mdg_code: string; qty: string }[]) => {
     if (rows.length === 0) return;
     setLines(rows.map((r) => ({ key: nextKey.current++, ...r })));
+    setApplied(rows.length);
   };
 
   return (
@@ -117,6 +120,7 @@ export function OrderForm() {
             const text = e.clipboardData.getData("text");
             if (text && /[\n\t,]/.test(text)) {
               e.preventDefault();
+              setBulk(text);
               applyRows(parseBulk(text));
             }
           }}
@@ -129,17 +133,20 @@ export function OrderForm() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => {
-              applyRows(parseBulk(bulk));
-              setBulk("");
-            }}
+            onClick={() => applyRows(parseBulk(bulk))}
             disabled={!bulk.trim()}
           >
             붙여넣은 내용 적용
           </Button>
-          <span className="text-xs text-muted-foreground">
-            붙여넣으면 아래 품목이 자동으로 채워집니다.
-          </span>
+          {applied !== null ? (
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              ✓ {applied}건이 아래 품목에 채워졌습니다.
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              붙여넣으면 아래 품목이 자동으로 채워집니다.
+            </span>
+          )}
         </div>
       </div>
 
