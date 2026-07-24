@@ -92,7 +92,10 @@ export default async function OrdersPage({
             placeholder="발주번호 · 거래처"
           />
         </div>
-        <label className="flex h-9 items-center gap-2 text-sm">
+        <label
+          className="flex h-9 items-center gap-2 text-sm"
+          title="전량 입고되지 않은 건 (미입고 · 부분입고)"
+        >
           <input
             type="checkbox"
             name="open"
@@ -100,7 +103,7 @@ export default async function OrdersPage({
             defaultChecked={openOnly}
             className="size-4"
           />
-          미입고만
+          미완료만
         </label>
         <Button type="submit">조회</Button>
         <Link

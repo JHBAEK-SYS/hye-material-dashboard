@@ -77,6 +77,17 @@ export function receiptStatus(
 }
 
 /**
+ * 아직 전량 입고되지 않았는가 (미입고 + 부분입고 = true, 입고완료 = false).
+ * receiptStatus 를 재사용해 판정 로직이 목록 배지 표시와 어긋나지 않도록 한다.
+ */
+export function isOutstanding(
+  orderQty: number,
+  receivedQty: number | null
+): boolean {
+  return receiptStatus(orderQty, receivedQty) !== "입고완료";
+}
+
+/**
  * 남은 수량 = orderQty - receivedQty. 음수가 되지 않도록 0으로 하한한다.
  * orderQty가 0 이하이거나 비정상인 경우에도 죽지 않도록 방어적으로 처리한다.
  */

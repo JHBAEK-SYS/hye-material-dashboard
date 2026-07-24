@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isOutstanding,
   receiptStatus,
   remainingQty,
   validateReceiveInput,
@@ -215,5 +216,39 @@ describe("remainingQty", () => {
 
   it("orderQty가 음수이어도 남은 수량은 0으로 하한한다", () => {
     expect(remainingQty(-10, 0)).toBe(0);
+  });
+});
+
+describe("isOutstanding", () => {
+  it("receivedQty가 null이면(미입고) true를 반환한다", () => {
+    expect(isOutstanding(30, null)).toBe(true);
+  });
+
+  it("receivedQty가 0이면(미입고) true를 반환한다", () => {
+    expect(isOutstanding(30, 0)).toBe(true);
+  });
+
+  it("부분입고(20/30)이면 true를 반환한다", () => {
+    expect(isOutstanding(30, 20)).toBe(true);
+  });
+
+  it("정확히 전량입고(30/30)이면 false를 반환한다", () => {
+    expect(isOutstanding(30, 30)).toBe(false);
+  });
+
+  it("초과입고(35/30)이면 false를 반환한다", () => {
+    expect(isOutstanding(30, 35)).toBe(false);
+  });
+
+  it("orderQty가 0이어도 죽지 않고 처리한다 (receivedQty 0 -> true)", () => {
+    expect(isOutstanding(0, 0)).toBe(true);
+  });
+
+  it("orderQty가 0이고 receivedQty가 양수이면 false를 반환한다", () => {
+    expect(isOutstanding(0, 5)).toBe(false);
+  });
+
+  it("orderQty가 음수이어도 죽지 않는다", () => {
+    expect(() => isOutstanding(-10, 5)).not.toThrow();
   });
 });

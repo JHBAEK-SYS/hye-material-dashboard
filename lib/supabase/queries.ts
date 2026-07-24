@@ -1,3 +1,4 @@
+import { isOutstanding } from "@/lib/receive/validate";
 import { createClient } from "@/lib/supabase/server";
 import {
   STOCK_STATUSES,
@@ -255,7 +256,18 @@ export interface PurchaseOrderResult {
   pageCount: number;
 }
 
-/** 도급발주 목록. openOnly=true 면 미입고(received_date 없음)만. */
+/**
+ * 도급발주 목록. openOnly=true 면 "아직 전량 입고되지 않은 건"(미입고 + 부분입고)만.
+ *
+ * openOnly=false: 기존과 동일하게 DB 레벨 .range() 페이지네이션 + count:"exact" 사용.
+ *
+ * openOnly=true: PostgREST(Supabase) 는 `received_qty < order_qty` 처럼 같은 행의
+ * 두 컬럼을 비교하는 필터를 지원하지 않는다. DB에서 거르려면 generated column이나
+ * 뷰를 새로 만들어야 하지만 이번 작업은 스키마를 건드리지 않기로 했으므로, 검색
+ * 조건에 맞는 행을 fetchAllRows 로 전량 조회한 뒤 isOutstanding() 으로 앱에서
+ * 걸러내고 그 결과를 페이지 단위로 잘라 반환한다. 데이터량이 크게 늘어나면
+ * (수만 건 이상) 이 방식은 비효율적이므로 그때는 generated column/뷰로 옮겨야 한다.
+ */
 export async function getPurchaseOrders(params: {
   search?: string;
   openOnly?: boolean;
@@ -266,21 +278,42 @@ export async function getPurchaseOrders(params: {
   const from = (page - 1) * LEDGER_PAGE_SIZE;
   const to = from + LEDGER_PAGE_SIZE - 1;
 
-  let query = supabase.from("purchase_orders").select("*", { count: "exact" });
-  if (params.openOnly) query = query.is("received_date", null);
-  if (params.search?.trim()) {
-    const term = params.search.trim().replace(/[%,()]/g, " ");
-    query = query.or(`po_no.ilike.%${term}%,vendor.ilike.%${term}%`);
+  const buildBase = (withCount: boolean) => {
+    let query = withCount
+      ? supabase.from("purchase_orders").select("*", { count: "exact" })
+      : supabase.from("purchase_orders").select("*");
+    if (params.search?.trim()) {
+      const term = params.search.trim().replace(/[%,()]/g, " ");
+      query = query.or(`po_no.ilike.%${term}%,vendor.ilike.%${term}%`);
+    }
+    return query
+      .order("order_date", { ascending: false })
+      .order("id", { ascending: false });
+  };
+
+  if (!params.openOnly) {
+    const { data, count, error } = await buildBase(true).range(from, to);
+    if (error) throw new Error(`발주 조회 실패: ${error.message}`);
+
+    const rows = await attachMaterials(supabase, (data ?? []) as PurchaseOrderRow[]);
+    const total = count ?? 0;
+    return {
+      rows,
+      count: total,
+      page,
+      pageSize: LEDGER_PAGE_SIZE,
+      pageCount: Math.max(1, Math.ceil(total / LEDGER_PAGE_SIZE)),
+    };
   }
 
-  const { data, count, error } = await query
-    .order("order_date", { ascending: false })
-    .order("id", { ascending: false })
-    .range(from, to);
-  if (error) throw new Error(`발주 조회 실패: ${error.message}`);
-
-  const rows = await attachMaterials(supabase, (data ?? []) as PurchaseOrderRow[]);
-  const total = count ?? 0;
+  const all = await fetchAllRows<PurchaseOrderRow>(
+    (batchFrom, batchTo) => buildBase(false).range(batchFrom, batchTo),
+    "발주 조회 실패"
+  );
+  const filtered = all.filter((r) => isOutstanding(r.order_qty, r.received_qty));
+  const total = filtered.length;
+  const pageRows = filtered.slice(from, to + 1);
+  const rows = await attachMaterials(supabase, pageRows);
   return {
     rows,
     count: total,
@@ -349,7 +382,18 @@ export interface ConsignedReqResult {
   pageCount: number;
 }
 
-/** 사급청구 목록. openOnly=true 면 미입고(received_date 없음)만. */
+/**
+ * 사급청구 목록. openOnly=true 면 "아직 전량 입고되지 않은 건"(미입고 + 부분입고)만.
+ *
+ * openOnly=false: 기존과 동일하게 DB 레벨 .range() 페이지네이션 + count:"exact" 사용.
+ *
+ * openOnly=true: PostgREST(Supabase) 는 `received_qty < request_qty` 처럼 같은 행의
+ * 두 컬럼을 비교하는 필터를 지원하지 않는다. DB에서 거르려면 generated column이나
+ * 뷰를 새로 만들어야 하지만 이번 작업은 스키마를 건드리지 않기로 했으므로, 검색
+ * 조건에 맞는 행을 fetchAllRows 로 전량 조회한 뒤 isOutstanding() 으로 앱에서
+ * 걸러내고 그 결과를 페이지 단위로 잘라 반환한다. 데이터량이 크게 늘어나면
+ * (수만 건 이상) 이 방식은 비효율적이므로 그때는 generated column/뷰로 옮겨야 한다.
+ */
 export async function getConsignedReqs(params: {
   search?: string;
   openOnly?: boolean;
@@ -360,21 +404,42 @@ export async function getConsignedReqs(params: {
   const from = (page - 1) * LEDGER_PAGE_SIZE;
   const to = from + LEDGER_PAGE_SIZE - 1;
 
-  let query = supabase.from("consigned_reqs").select("*", { count: "exact" });
-  if (params.openOnly) query = query.is("received_date", null);
-  if (params.search?.trim()) {
-    const term = params.search.trim().replace(/[%,()]/g, " ");
-    query = query.or(`sg_no.ilike.%${term}%`);
+  const buildBase = (withCount: boolean) => {
+    let query = withCount
+      ? supabase.from("consigned_reqs").select("*", { count: "exact" })
+      : supabase.from("consigned_reqs").select("*");
+    if (params.search?.trim()) {
+      const term = params.search.trim().replace(/[%,()]/g, " ");
+      query = query.or(`sg_no.ilike.%${term}%`);
+    }
+    return query
+      .order("request_date", { ascending: false })
+      .order("id", { ascending: false });
+  };
+
+  if (!params.openOnly) {
+    const { data, count, error } = await buildBase(true).range(from, to);
+    if (error) throw new Error(`사급청구 조회 실패: ${error.message}`);
+
+    const rows = await attachMaterials(supabase, (data ?? []) as ConsignedReqRow[]);
+    const total = count ?? 0;
+    return {
+      rows,
+      count: total,
+      page,
+      pageSize: LEDGER_PAGE_SIZE,
+      pageCount: Math.max(1, Math.ceil(total / LEDGER_PAGE_SIZE)),
+    };
   }
 
-  const { data, count, error } = await query
-    .order("request_date", { ascending: false })
-    .order("id", { ascending: false })
-    .range(from, to);
-  if (error) throw new Error(`사급청구 조회 실패: ${error.message}`);
-
-  const rows = await attachMaterials(supabase, (data ?? []) as ConsignedReqRow[]);
-  const total = count ?? 0;
+  const all = await fetchAllRows<ConsignedReqRow>(
+    (batchFrom, batchTo) => buildBase(false).range(batchFrom, batchTo),
+    "사급청구 조회 실패"
+  );
+  const filtered = all.filter((r) => isOutstanding(r.request_qty, r.received_qty));
+  const total = filtered.length;
+  const pageRows = filtered.slice(from, to + 1);
+  const rows = await attachMaterials(supabase, pageRows);
   return {
     rows,
     count: total,
@@ -484,7 +549,12 @@ export interface PurchaseOrdersExportQuery {
   openOnly?: boolean;
 }
 
-/** 도급발주 전량 조회 (엑셀 export 용). getPurchaseOrders 와 동일한 필터/정렬. */
+/**
+ * 도급발주 전량 조회 (엑셀 export 용). getPurchaseOrders 와 동일한 필터/정렬.
+ * openOnly=true 는 "아직 전량 입고되지 않은 건"(미입고 + 부분입고) 기준으로,
+ * PostgREST 가 컬럼 간 비교를 지원하지 않아 isOutstanding() 으로 앱에서 거른다.
+ * attachMaterials 는 불필요한 조인을 줄이기 위해 필터 이후에 적용한다.
+ */
 export async function getAllPurchaseOrdersForExport(
   params: PurchaseOrdersExportQuery = {}
 ): Promise<PurchaseOrderRow[]> {
@@ -492,7 +562,6 @@ export async function getAllPurchaseOrdersForExport(
 
   const buildBase = () => {
     let query = supabase.from("purchase_orders").select("*");
-    if (params.openOnly) query = query.is("received_date", null);
     if (params.search?.trim()) {
       const term = params.search.trim().replace(/[%,()]/g, " ");
       query = query.or(`po_no.ilike.%${term}%,vendor.ilike.%${term}%`);
@@ -506,7 +575,10 @@ export async function getAllPurchaseOrdersForExport(
     (from, to) => buildBase().range(from, to),
     "발주 전체 조회 실패"
   );
-  return attachMaterials(supabase, rows);
+  const filtered = params.openOnly
+    ? rows.filter((r) => isOutstanding(r.order_qty, r.received_qty))
+    : rows;
+  return attachMaterials(supabase, filtered);
 }
 
 export interface ConsignedReqsExportQuery {
@@ -514,7 +586,12 @@ export interface ConsignedReqsExportQuery {
   openOnly?: boolean;
 }
 
-/** 사급청구 전량 조회 (엑셀 export 용). getConsignedReqs 와 동일한 필터/정렬. */
+/**
+ * 사급청구 전량 조회 (엑셀 export 용). getConsignedReqs 와 동일한 필터/정렬.
+ * openOnly=true 는 "아직 전량 입고되지 않은 건"(미입고 + 부분입고) 기준으로,
+ * PostgREST 가 컬럼 간 비교를 지원하지 않아 isOutstanding() 으로 앱에서 거른다.
+ * attachMaterials 는 불필요한 조인을 줄이기 위해 필터 이후에 적용한다.
+ */
 export async function getAllConsignedReqsForExport(
   params: ConsignedReqsExportQuery = {}
 ): Promise<ConsignedReqRow[]> {
@@ -522,7 +599,6 @@ export async function getAllConsignedReqsForExport(
 
   const buildBase = () => {
     let query = supabase.from("consigned_reqs").select("*");
-    if (params.openOnly) query = query.is("received_date", null);
     if (params.search?.trim()) {
       const term = params.search.trim().replace(/[%,()]/g, " ");
       query = query.or(`sg_no.ilike.%${term}%`);
@@ -536,7 +612,10 @@ export async function getAllConsignedReqsForExport(
     (from, to) => buildBase().range(from, to),
     "사급청구 전체 조회 실패"
   );
-  return attachMaterials(supabase, rows);
+  const filtered = params.openOnly
+    ? rows.filter((r) => isOutstanding(r.request_qty, r.received_qty))
+    : rows;
+  return attachMaterials(supabase, filtered);
 }
 
 export interface IssuesExportQuery {
