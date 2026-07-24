@@ -6,6 +6,7 @@ import {
   validateConsignedReqHeader,
   validateConsignedReqLines,
 } from "@/lib/consigned-reqs/validate";
+import { validateReceiveInput } from "@/lib/receive/validate";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "@/lib/form-state";
 
@@ -99,25 +100,28 @@ export async function createConsignedReq(
   };
 }
 
-/** 사급청구 입고처리 (received_date=오늘, received_qty=입력값) */
+/** 사급청구 입고처리 (received_date=사용자 입력값, received_qty=입력값) */
 export async function receiveConsignedReq(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
   const id = Number(formData.get("id"));
-  const qty = Number(formData.get("received_qty"));
-  if (!Number.isFinite(id) || id <= 0) {
-    return { error: "잘못된 사급청구 ID.", message: null };
-  }
-  if (!Number.isFinite(qty) || qty <= 0) {
-    return { error: "입고수량은 0보다 커야 합니다.", message: null };
+  const received_date = String(formData.get("received_date") ?? "").trim();
+  const received_qty = String(formData.get("received_qty") ?? "").trim();
+
+  const validationError = validateReceiveInput({
+    id,
+    received_date,
+    received_qty: received_qty,
+  });
+  if (validationError) {
+    return { error: validationError, message: null };
   }
 
   const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
   const { data, error } = await supabase
     .from("consigned_reqs")
-    .update({ received_date: today, received_qty: qty })
+    .update({ received_date, received_qty: Number(received_qty) })
     .eq("id", id)
     .select();
 

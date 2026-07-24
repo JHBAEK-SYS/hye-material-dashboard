@@ -17,6 +17,8 @@ function Btn() {
   );
 }
 
+const today = () => new Date().toISOString().slice(0, 10);
+
 /** 표 행 안의 소형 입고처리 폼 */
 export function ReceiveForm({
   id,
@@ -40,6 +42,13 @@ export function ReceiveForm({
         defaultValue={defaultQty}
         className="h-8 w-20"
         aria-label="입고수량"
+      />
+      <Input
+        name="received_date"
+        type="date"
+        defaultValue={today()}
+        className="h-8 w-36"
+        aria-label="입고일"
       />
       <Btn />
       {state.error ? (
