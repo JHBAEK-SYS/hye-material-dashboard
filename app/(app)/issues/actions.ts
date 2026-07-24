@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import { validateIssueHeader, validateIssueLines } from "@/lib/issues/validate";
+import {
+  validateDeleteId,
+  validateIssueHeader,
+  validateIssueLines,
+} from "@/lib/issues/validate";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "@/lib/form-state";
 
@@ -89,4 +93,36 @@ export async function createIssue(
     error: null,
     message: `출고 '${req_no}' — ${data.length}개 품목이 등록되었습니다.`,
   };
+}
+
+/** 출고 품목 삭제 (실수 복구용) */
+export async function deleteIssue(
+  _prev: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const id = Number(formData.get("id"));
+  const idError = validateDeleteId(id);
+  if (idError) {
+    return { error: idError, message: null };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("issues")
+    .delete()
+    .eq("id", id)
+    .select();
+
+  if (error) return { error: `삭제 실패: ${error.message}`, message: null };
+  if (!data || data.length === 0) {
+    return {
+      error:
+        "삭제가 반영되지 않았습니다. issues 테이블에 authenticated DELETE 정책이 필요합니다.",
+      message: null,
+    };
+  }
+
+  revalidatePath("/issues");
+  revalidatePath("/dashboard");
+  return { error: null, message: "삭제되었습니다." };
 }

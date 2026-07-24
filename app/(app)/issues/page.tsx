@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { DeleteButton } from "@/app/(app)/issues/delete-button";
 import { IssueForm } from "@/app/(app)/issues/issue-form";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,6 +94,7 @@ export default async function IssuesPage({
               <TableHead className="text-right">수량</TableHead>
               <TableHead>장비명</TableHead>
               <TableHead>담당자</TableHead>
+              <TableHead className="text-right">관리</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -100,7 +102,7 @@ export default async function IssuesPage({
               <TableRow>
                 <TableCell
                   className="h-24 text-center text-muted-foreground"
-                  colSpan={6}
+                  colSpan={7}
                 >
                   출고 내역이 없습니다. 위 &ldquo;신규 출고 등록&rdquo;으로 추가하세요.
                 </TableCell>
@@ -120,6 +122,9 @@ export default async function IssuesPage({
                   </TableCell>
                   <TableCell>{row.tool_name ?? "-"}</TableCell>
                   <TableCell>{row.staff ?? "-"}</TableCell>
+                  <TableCell className="text-right">
+                    <DeleteButton id={row.id} label={row.req_no} />
+                  </TableCell>
                 </TableRow>
               ))
             )}

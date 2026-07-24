@@ -20,6 +20,17 @@ export function validateIssueHeader(input: {
   return null;
 }
 
+/**
+ * 출고기록 삭제 시 넘어온 id 검증.
+ * 유한수이고 0보다 큰 정수여야 한다.
+ */
+export function validateDeleteId(id: number): string | null {
+  if (!Number.isFinite(id) || !Number.isInteger(id) || id <= 0) {
+    return "잘못된 출고 ID.";
+  }
+  return null;
+}
+
 export function validateIssueLines(
   lines: { mdg_code: string; qty: string }[]
 ): string | null {

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { validateIssueHeader, validateIssueLines } from "@/lib/issues/validate";
+import {
+  validateDeleteId,
+  validateIssueHeader,
+  validateIssueLines,
+} from "@/lib/issues/validate";
 
 const validHeader = {
   req_no: "REQ-2026-0001",
@@ -94,5 +98,38 @@ describe("validateIssueLines", () => {
         { mdg_code: "538000", qty: "1.5" },
       ])
     ).toBeNull();
+  });
+});
+
+describe("validateDeleteId", () => {
+  it("양의 정수이면 null을 반환한다", () => {
+    expect(validateDeleteId(1)).toBeNull();
+    expect(validateDeleteId(42)).toBeNull();
+  });
+
+  it("0이면 에러를 반환한다", () => {
+    const result = validateDeleteId(0);
+    expect(result).not.toBeNull();
+    expect(typeof result).toBe("string");
+  });
+
+  it("음수이면 에러를 반환한다", () => {
+    const result = validateDeleteId(-5);
+    expect(result).not.toBeNull();
+  });
+
+  it("소수이면 에러를 반환한다", () => {
+    const result = validateDeleteId(1.5);
+    expect(result).not.toBeNull();
+  });
+
+  it("NaN이면 에러를 반환한다", () => {
+    const result = validateDeleteId(NaN);
+    expect(result).not.toBeNull();
+  });
+
+  it("무한대이면 에러를 반환한다", () => {
+    const result = validateDeleteId(Infinity);
+    expect(result).not.toBeNull();
   });
 });
