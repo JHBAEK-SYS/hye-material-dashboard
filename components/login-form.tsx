@@ -81,7 +81,10 @@ export function LoginForm() {
             </p>
           ) : null}
           {state.message ? (
-            <p className="text-sm text-muted-foreground" role="status">
+            <p
+              className="whitespace-pre-line text-sm text-muted-foreground"
+              role="status"
+            >
               {state.message}
             </p>
           ) : null}
@@ -91,6 +94,10 @@ export function LoginForm() {
             <SubmitButton intent="signup" variant="outline">
               회원가입
             </SubmitButton>
+            <p className="text-xs text-muted-foreground">
+              처음이신가요? 이메일과 비밀번호를 입력한 뒤 회원가입을 누르면
+              인증 메일이 발송됩니다.
+            </p>
           </div>
         </form>
       </CardContent>
