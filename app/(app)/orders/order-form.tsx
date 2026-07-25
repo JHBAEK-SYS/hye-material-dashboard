@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { createPurchaseOrder } from "@/app/(app)/orders/actions";
+import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -78,11 +79,7 @@ export function OrderForm({ canEdit }: { canEdit: boolean }) {
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-5">
-      {!canEdit ? (
-        <p className="text-sm text-muted-foreground">
-          조회 전용 계정입니다. 수정 권한이 없습니다.
-        </p>
-      ) : null}
+      {!canEdit ? <ReadOnlyNotice /> : null}
       {/* 발주 헤더 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="flex flex-col gap-1.5">

@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 
 import { createMaterial } from "@/app/(app)/materials/actions";
+import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,11 +32,7 @@ export function MaterialForm({ canEdit }: { canEdit: boolean }) {
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-5">
-      {!canEdit ? (
-        <p className="text-sm text-muted-foreground">
-          조회 전용 계정입니다. 수정 권한이 없습니다.
-        </p>
-      ) : null}
+      {!canEdit ? <ReadOnlyNotice /> : null}
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="mdg_code">MDG코드 *</Label>

@@ -69,9 +69,9 @@ export default async function ConsignedReqsPage({
       </div>
 
       {/* 신규 등록 */}
-      <details className="rounded-lg border">
+      <details className="rounded-lg border" open>
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
-          + 신규 사급청구 등록
+          신규 사급청구 등록
         </summary>
         <div className="border-t p-4">
           <ConsignedReqForm canEdit={canEdit} />

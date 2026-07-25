@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { updateMaterial } from "@/app/(app)/materials/[id]/actions";
 import { initialUpdateState } from "@/app/(app)/materials/[id]/update-state";
+import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,11 +37,7 @@ export function EditForm({
     <form action={formAction} className="flex flex-col gap-5">
       <input type="hidden" name="id" value={material.id} />
 
-      {!canEdit ? (
-        <p className="text-sm text-muted-foreground">
-          조회 전용 계정입니다. 수정 권한이 없습니다.
-        </p>
-      ) : null}
+      {!canEdit ? <ReadOnlyNotice /> : null}
 
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
