@@ -69,9 +69,17 @@ export default async function MaterialsPage({
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">자재 마스터</h1>
-          <a href={exportHref} className={buttonVariants({ variant: "outline" })}>
-            엑셀 다운로드
-          </a>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/materials/bulk-adjust"
+              className={buttonVariants({ variant: "outline" })}
+            >
+              재고 일괄 조정
+            </Link>
+            <a href={exportHref} className={buttonVariants({ variant: "outline" })}>
+              엑셀 다운로드
+            </a>
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">
           재고 현황(v_stock_status) 기준 · 총 {num(result.count)}건

@@ -702,3 +702,52 @@ export async function getAllIssuesForExport(
   );
   return attachMaterials(supabase, rows);
 }
+
+// ---------------------------------------------------------------------------
+// 재고 일괄 조정(엑셀 업로드) 용: mdg_code 목록으로 v_stock_status 를 조회한다.
+// Supabase/PostgREST 는 .in() 에 넘기는 배열이 너무 크면(예: URL 길이 제한)
+// 문제가 될 수 있으므로 IN_CHUNK_SIZE 단위로 나눠 여러 번 조회해 합친다.
+// ---------------------------------------------------------------------------
+
+const IN_CHUNK_SIZE = 500;
+
+/**
+ * mdg_code 목록(중복/공백 허용)을 받아 v_stock_status 를 배치 조회하고,
+ * trim된 mdg_code -> StockStatusRow Map으로 반환한다.
+ * 존재하지 않는 mdg_code는 그냥 Map에 없는 것으로 처리한다(호출부에서
+ * not_found 판정에 사용).
+ */
+export async function getStockStatusByMdgCodes(
+  mdgCodes: string[]
+): Promise<Map<string, StockStatusRow>> {
+  const supabase = await createClient();
+  const map = new Map<string, StockStatusRow>();
+
+  const uniqueCodes = [
+    ...new Set(
+      mdgCodes.map((c) => c.trim()).filter((c) => c !== "")
+    ),
+  ];
+
+  for (let i = 0; i < uniqueCodes.length; i += IN_CHUNK_SIZE) {
+    const chunk = uniqueCodes.slice(i, i + IN_CHUNK_SIZE);
+    if (chunk.length === 0) continue;
+
+    const { data, error } = await supabase
+      .from("v_stock_status")
+      .select("*")
+      .in("mdg_code", chunk);
+
+    if (error) {
+      throw new Error(`자재 일괄 조회 실패: ${error.message}`);
+    }
+
+    for (const row of (data ?? []) as StockStatusRow[]) {
+      if (row.mdg_code) {
+        map.set(row.mdg_code.trim(), row);
+      }
+    }
+  }
+
+  return map;
+}
