@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { DeleteMaterialButton } from "@/app/(app)/materials/[id]/delete-material-button";
 import { EditForm } from "@/app/(app)/materials/[id]/edit-form";
+import { StockAdjustForm } from "@/app/(app)/materials/[id]/stock-adjust-form";
 import { StatusBadge } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -83,7 +84,9 @@ export default async function MaterialDetailPage({
         <CardHeader>
           <CardTitle className="text-base">재고 정보</CardTitle>
           <CardDescription>
-            v_stock_status 기준 · 재고 수치는 자동 계산되어 편집할 수 없습니다.
+            v_stock_status 기준 · 입고·출고 누계는 전표에서 자동 집계되어
+            직접 편집할 수 없습니다. 실사 후 수량을 맞추려면 아래 &apos;재고
+            조정&apos;을 사용하세요.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -95,6 +98,27 @@ export default async function MaterialDetailPage({
               </div>
             ))}
           </dl>
+        </CardContent>
+      </Card>
+
+      {/* 재고 조정 (실사) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">재고 조정 (실사)</CardTitle>
+          <CardDescription>
+            실사 결과 수량(원하는 현재고)을 입력하면, 입고·출고 누계를
+            반영해 기초재고를 역산해서 저장합니다.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <StockAdjustForm
+            materialId={material.id}
+            currentStock={stock?.current_stock ?? 0}
+            openingStock={material.opening_stock ?? 0}
+            inTotal={stock?.in_total ?? 0}
+            outTotal={stock?.out_total ?? 0}
+            canEdit={canEdit}
+          />
         </CardContent>
       </Card>
 
