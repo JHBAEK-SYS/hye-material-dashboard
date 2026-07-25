@@ -1,16 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { LogoutButton } from "@/components/logout-button";
+import { AppSidebar } from "@/components/app-sidebar";
 import { createClient } from "@/lib/supabase/server";
-
-const NAV = [
-  { href: "/dashboard", label: "대시보드" },
-  { href: "/materials", label: "자재 마스터" },
-  { href: "/orders", label: "도급발주" },
-  { href: "/consigned-reqs", label: "사급청구" },
-  { href: "/issues", label: "출고기록" },
-];
 
 export default async function AppLayout({
   children,
@@ -28,33 +19,9 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex min-h-svh flex-col">
-      <header className="flex items-center justify-between border-b px-6 py-3">
-        <div className="flex items-center gap-6">
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold">자재 대시보드</span>
-            <span className="text-xs text-muted-foreground">반도체 구매팀</span>
-          </div>
-          <nav className="flex items-center gap-1">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden text-sm text-muted-foreground sm:inline">
-            {user.email}
-          </span>
-          <LogoutButton />
-        </div>
-      </header>
-      <main className="flex-1 p-6">{children}</main>
+    <div className="flex h-svh flex-col overflow-hidden bg-background text-foreground md:flex-row">
+      <AppSidebar userEmail={user.email ?? null} />
+      <main className="min-w-0 flex-1 overflow-y-auto p-6">{children}</main>
     </div>
   );
 }

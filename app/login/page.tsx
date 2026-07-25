@@ -17,7 +17,7 @@ export default async function LoginPage() {
     <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/30 p-6">
       <LoginForm />
       <p className="text-xs text-muted-foreground">
-        반도체 구매팀 자재 대시보드
+        HANYANGENG USA 자재 대시보드
       </p>
     </main>
   );
