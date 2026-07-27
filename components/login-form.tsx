@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -65,7 +66,15 @@ export function LoginForm() {
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="password">비밀번호</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">비밀번호</Label>
+              <Link
+                href="/login/forgot-password"
+                className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+              >
+                비밀번호를 잊으셨나요?
+              </Link>
+            </div>
             <Input
               id="password"
               name="password"
