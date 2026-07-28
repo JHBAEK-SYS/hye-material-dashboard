@@ -4,6 +4,8 @@ export interface BulkNewInputRow {
   mdg_code: string;
   part_no: string;
   manufacturer: string;
+  material_name?: string;
+  size?: string;
 }
 
 /**
@@ -41,8 +43,14 @@ function normalizeCell(value: ExcelJS.CellValue): string {
  *   포함된 열을 part_no 열로, "MANUFACTURER"/"제조사"/"MAKER"가 포함된
  *   열을 manufacturer 열로 찾는다(모두 대소문자 무시). 셋 중 하나라도
  *   못 찾으면 에러.
- * - 헤더 다음 행부터 sheet.rowCount까지 순회한다. 세 값이 모두 빈 문자열인
- *   행은 건너뛴다(중간에 빈 줄이 섞인 파일이 있다).
+ * - 자재명 열("MATERIAL NAME"/"DESCRIPTION"/"자재명"/"품명")과 규격 열
+ *   ("SIZE"/"SPEC"/"규격")은 선택이다 — 없어도 에러를 던지지 않고 해당
+ *   값을 빈 문자열로 채운다. 이미 다른 용도로 잡힌 열 번호는 재사용하지
+ *   않는다(예: MANUFACTURER와 MATERIAL NAME이 둘 다 "MA"로 시작하지만
+ *   서로 다른 열로 구분되어야 한다).
+ * - 헤더 다음 행부터 sheet.rowCount까지 순회한다. mdg_code/part_no/
+ *   manufacturer 세 값이 모두 빈 문자열인 행은 건너뛴다(중간에 빈 줄이
+ *   섞인 파일이 있다). 이 판정에 자재명/규격은 포함하지 않는다.
  */
 export async function parseBulkNewFile(
   buffer: Buffer
@@ -99,27 +107,65 @@ export async function parseBulkNewFile(
   let mdgColIndex: number | null = null;
   let partColIndex: number | null = null;
   let manufacturerColIndex: number | null = null;
+  let materialNameColIndex: number | null = null;
+  let sizeColIndex: number | null = null;
+  // 한 열 번호가 두 용도로 겹쳐 잡히지 않도록(예: MANUFACTURER와 MATERIAL
+  // NAME, 품번과 품명) 이미 다른 필드에 배정된 열 번호는 재사용하지 않는다.
+  const claimedCols = new Set<number>();
 
   headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
     const text = normalizeCell(cell.value).trim();
     headerTexts.push(text);
     const upper = text.toUpperCase();
-    if (mdgColIndex === null && upper.includes("MDG")) {
+
+    if (
+      mdgColIndex === null &&
+      !claimedCols.has(colNumber) &&
+      upper.includes("MDG")
+    ) {
       mdgColIndex = colNumber;
+      claimedCols.add(colNumber);
+      return;
     }
     if (
       partColIndex === null &&
+      !claimedCols.has(colNumber) &&
       (upper.includes("PART") || text.includes("품번"))
     ) {
       partColIndex = colNumber;
+      claimedCols.add(colNumber);
+      return;
     }
     if (
       manufacturerColIndex === null &&
+      !claimedCols.has(colNumber) &&
       (upper.includes("MANUFACTURER") ||
         text.includes("제조사") ||
         upper.includes("MAKER"))
     ) {
       manufacturerColIndex = colNumber;
+      claimedCols.add(colNumber);
+      return;
+    }
+    if (
+      materialNameColIndex === null &&
+      !claimedCols.has(colNumber) &&
+      (upper.includes("MATERIAL NAME") ||
+        upper.includes("DESCRIPTION") ||
+        text.includes("자재명") ||
+        text.includes("품명"))
+    ) {
+      materialNameColIndex = colNumber;
+      claimedCols.add(colNumber);
+      return;
+    }
+    if (
+      sizeColIndex === null &&
+      !claimedCols.has(colNumber) &&
+      (upper.includes("SIZE") || upper.includes("SPEC") || text.includes("규격"))
+    ) {
+      sizeColIndex = colNumber;
+      claimedCols.add(colNumber);
     }
   });
 
@@ -145,10 +191,20 @@ export async function parseBulkNewFile(
     if (mdgText === "" && partText === "" && manufacturerText === "") {
       continue;
     }
+    const materialNameText =
+      materialNameColIndex !== null
+        ? normalizeCell(row.getCell(materialNameColIndex).value).trim()
+        : "";
+    const sizeText =
+      sizeColIndex !== null
+        ? normalizeCell(row.getCell(sizeColIndex).value).trim()
+        : "";
     rows.push({
       mdg_code: mdgText,
       part_no: partText,
       manufacturer: manufacturerText,
+      material_name: materialNameText,
+      size: sizeText,
     });
   }
 

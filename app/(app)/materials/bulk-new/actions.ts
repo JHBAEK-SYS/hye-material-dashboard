@@ -92,11 +92,21 @@ export type BulkNewCommitResult =
 function isValidInputRow(v: unknown): v is BulkNewInputRow {
   if (typeof v !== "object" || v === null) return false;
   const r = v as Record<string, unknown>;
-  return (
-    typeof r.mdg_code === "string" &&
-    typeof r.part_no === "string" &&
-    typeof r.manufacturer === "string"
-  );
+  if (
+    typeof r.mdg_code !== "string" ||
+    typeof r.part_no !== "string" ||
+    typeof r.manufacturer !== "string"
+  ) {
+    return false;
+  }
+  // material_name/size는 선택 속성 — 있으면 string이어야 하고, 없어도 통과.
+  if (r.material_name !== undefined && typeof r.material_name !== "string") {
+    return false;
+  }
+  if (r.size !== undefined && typeof r.size !== "string") {
+    return false;
+  }
+  return true;
 }
 
 function isValidApprovedIds(v: unknown): v is number[] {
@@ -184,8 +194,8 @@ export async function commitBulkNew(
       mdg_code: r.mdg_code,
       part_no: r.part_no || null,
       manufacturer: r.manufacturer || null,
-      material_name: r.inheritedName,
-      size: r.inheritedSize,
+      material_name: r.resolvedName, // NOT NULL — buildBulkNewPreview가 항상 비어있지 않게 보장
+      size: r.resolvedSize,
       safety_stock: 0,
       opening_stock: 0,
       is_active: true,

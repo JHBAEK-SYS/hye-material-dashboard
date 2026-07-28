@@ -47,16 +47,22 @@ describe("parseBulkNewFile", () => {
         manufacturer: "Above All",
         mdg_code: "602731",
         part_no: "041DI060",
+        material_name: "",
+        size: "",
       },
       {
         manufacturer: "Aeroflex",
         mdg_code: "607401",
         part_no: "3MNEBST11034 (Aeroflex)",
+        material_name: "",
+        size: "",
       },
       {
         manufacturer: "Amphenol",
         mdg_code: "610001",
         part_no: "AMP-001",
+        material_name: "",
+        size: "",
       },
     ]);
   });
@@ -68,7 +74,13 @@ describe("parseBulkNewFile", () => {
     ]);
     const result = await parseBulkNewFile(buffer);
     expect(result).toEqual([
-      { manufacturer: "Above All", mdg_code: "602731", part_no: "041DI060" },
+      {
+        manufacturer: "Above All",
+        mdg_code: "602731",
+        part_no: "041DI060",
+        material_name: "",
+        size: "",
+      },
     ]);
   });
 
@@ -79,7 +91,13 @@ describe("parseBulkNewFile", () => {
     ]);
     const result = await parseBulkNewFile(buffer);
     expect(result).toEqual([
-      { manufacturer: "에이보올", mdg_code: "602731", part_no: "041DI060" },
+      {
+        manufacturer: "에이보올",
+        mdg_code: "602731",
+        part_no: "041DI060",
+        material_name: "",
+        size: "",
+      },
     ]);
   });
 
@@ -90,7 +108,13 @@ describe("parseBulkNewFile", () => {
     ]);
     const result = await parseBulkNewFile(buffer);
     expect(result).toEqual([
-      { manufacturer: "Above All", mdg_code: "602731", part_no: "041DI060" },
+      {
+        manufacturer: "Above All",
+        mdg_code: "602731",
+        part_no: "041DI060",
+        material_name: "",
+        size: "",
+      },
     ]);
   });
 
@@ -104,11 +128,19 @@ describe("parseBulkNewFile", () => {
     ]);
     const result = await parseBulkNewFile(buffer);
     expect(result).toEqual([
-      { manufacturer: "Above All", mdg_code: "602731", part_no: "041DI060" },
+      {
+        manufacturer: "Above All",
+        mdg_code: "602731",
+        part_no: "041DI060",
+        material_name: "",
+        size: "",
+      },
       {
         manufacturer: "Aeroflex",
         mdg_code: "607401",
         part_no: "3MNEBST11034 (Aeroflex)",
+        material_name: "",
+        size: "",
       },
     ]);
   });
@@ -120,7 +152,13 @@ describe("parseBulkNewFile", () => {
     ]);
     const result = await parseBulkNewFile(buffer);
     expect(result).toEqual([
-      { manufacturer: "Above All", mdg_code: "602731", part_no: "041DI060" },
+      {
+        manufacturer: "Above All",
+        mdg_code: "602731",
+        part_no: "041DI060",
+        material_name: "",
+        size: "",
+      },
     ]);
   });
 
@@ -171,5 +209,73 @@ describe("parseBulkNewFile", () => {
     await expect(parseBulkNewFile(buffer)).rejects.toThrow(
       "엑셀 파일에 시트가 없습니다."
     );
+  });
+
+  it("자재명·규격 열이 있으면 값을 읽는다", async () => {
+    const buffer = await buildBuffer([
+      ["Manufacturer", "MDG Code", "Part Number", "Material Name", "Size"],
+      ["Above All", "602731", "041DI060", "Foam Strip", "1/4 inch"],
+    ]);
+    const result = await parseBulkNewFile(buffer);
+    expect(result).toEqual([
+      {
+        manufacturer: "Above All",
+        mdg_code: "602731",
+        part_no: "041DI060",
+        material_name: "Foam Strip",
+        size: "1/4 inch",
+      },
+    ]);
+  });
+
+  it("자재명·규격 열이 없는 파일(기존 3열만)은 에러 없이 빈 문자열로 채운다", async () => {
+    const buffer = await buildBuffer([
+      ["Manufacturer", "MDG Code", "Part Number"],
+      ["Above All", "602731", "041DI060"],
+    ]);
+    const result = await parseBulkNewFile(buffer);
+    expect(result).toEqual([
+      {
+        manufacturer: "Above All",
+        mdg_code: "602731",
+        part_no: "041DI060",
+        material_name: "",
+        size: "",
+      },
+    ]);
+  });
+
+  it("Manufacturer와 Material Name이 둘 다 있으면 서로 다른 열로 정확히 잡는다", async () => {
+    const buffer = await buildBuffer([
+      ["MDG Code", "Part Number", "Manufacturer", "Material Name"],
+      ["602731", "041DI060", "Above All", "Foam Strip"],
+    ]);
+    const result = await parseBulkNewFile(buffer);
+    expect(result).toEqual([
+      {
+        mdg_code: "602731",
+        part_no: "041DI060",
+        manufacturer: "Above All",
+        material_name: "Foam Strip",
+        size: "",
+      },
+    ]);
+  });
+
+  it("품번과 품명이 둘 다 있으면 각각 part_no/material_name으로 잡는다", async () => {
+    const buffer = await buildBuffer([
+      ["제조사", "MDG코드", "품번", "품명"],
+      ["에이보올", "602731", "041DI060", "폼 스트립"],
+    ]);
+    const result = await parseBulkNewFile(buffer);
+    expect(result).toEqual([
+      {
+        manufacturer: "에이보올",
+        mdg_code: "602731",
+        part_no: "041DI060",
+        material_name: "폼 스트립",
+        size: "",
+      },
+    ]);
   });
 });

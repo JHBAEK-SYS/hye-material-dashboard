@@ -66,8 +66,8 @@ describe("buildBulkNewPreview", () => {
         mdg_code: "528191",
         part_no: "38SL-2-304",
         manufacturer: "Steel O'Brien",
-        inheritedName: "Lap Joint Flange Ring SS304",
-        inheritedSize: "1",
+        resolvedName: "Lap Joint Flange Ring SS304",
+        resolvedSize: "1",
       },
     ]);
   });
@@ -255,7 +255,12 @@ describe("buildBulkNewPreview", () => {
       },
     ];
     const rows: BulkNewInputRow[] = [
-      { mdg_code: "700000", part_no: "", manufacturer: "Any" },
+      {
+        mdg_code: "700000",
+        part_no: "",
+        manufacturer: "Any",
+        material_name: "새 자재",
+      },
     ];
 
     const result = buildBulkNewPreview(rows, existing);
@@ -265,8 +270,8 @@ describe("buildBulkNewPreview", () => {
         mdg_code: "700000",
         part_no: "",
         manufacturer: "Any",
-        inheritedName: null,
-        inheritedSize: null,
+        resolvedName: "새 자재",
+        resolvedSize: null,
       },
     ]);
   });
@@ -274,7 +279,7 @@ describe("buildBulkNewPreview", () => {
   it("입력 순서를 유지한다", () => {
     const rows: BulkNewInputRow[] = [
       { mdg_code: "", part_no: "P1", manufacturer: "M1" },
-      { mdg_code: "AAA", part_no: "P2", manufacturer: "M2" },
+      { mdg_code: "AAA", part_no: "P2", manufacturer: "M2", material_name: "이름" },
     ];
     const result = buildBulkNewPreview(rows, []);
     expect(result.map((r) => r.status)).toEqual(["invalid", "new"]);
@@ -306,14 +311,19 @@ describe("buildBulkNewPreview", () => {
     const result = buildBulkNewPreview(rows, existing);
     expect(result[0].status).toBe("new");
     if (result[0].status === "new") {
-      expect(result[0].inheritedName).toBe("두번째 이름");
-      expect(result[0].inheritedSize).toBe("2");
+      expect(result[0].resolvedName).toBe("두번째 이름");
+      expect(result[0].resolvedSize).toBe("2");
     }
   });
 
-  it("상속할 기존 행이 없으면 inheritedName/inheritedSize는 null", () => {
+  it("상속할 기존 행이 없고 파일에 자재명이 있으면 그 값을 쓰고, 규격은 null이 된다", () => {
     const rows: BulkNewInputRow[] = [
-      { mdg_code: "NEWCODE", part_no: "P1", manufacturer: "M1" },
+      {
+        mdg_code: "NEWCODE",
+        part_no: "P1",
+        manufacturer: "M1",
+        material_name: "새 자재명",
+      },
     ];
     const result = buildBulkNewPreview(rows, []);
     expect(result).toEqual([
@@ -322,15 +332,21 @@ describe("buildBulkNewPreview", () => {
         mdg_code: "NEWCODE",
         part_no: "P1",
         manufacturer: "M1",
-        inheritedName: null,
-        inheritedSize: null,
+        resolvedName: "새 자재명",
+        resolvedSize: null,
       },
     ]);
   });
 
-  it("값 앞뒤 공백은 trim하여 출력한다", () => {
+  it("값 앞뒤 공백은 trim하여 출력한다(자재명 포함)", () => {
     const rows: BulkNewInputRow[] = [
-      { mdg_code: "  NEWCODE  ", part_no: "  P1  ", manufacturer: "  M1  " },
+      {
+        mdg_code: "  NEWCODE  ",
+        part_no: "  P1  ",
+        manufacturer: "  M1  ",
+        material_name: "  트림자재명  ",
+        size: "  10mm  ",
+      },
     ];
     const result = buildBulkNewPreview(rows, []);
     expect(result[0]).toEqual({
@@ -338,9 +354,122 @@ describe("buildBulkNewPreview", () => {
       mdg_code: "NEWCODE",
       part_no: "P1",
       manufacturer: "M1",
-      inheritedName: null,
-      inheritedSize: null,
+      resolvedName: "트림자재명",
+      resolvedSize: "10mm",
     });
+  });
+
+  it("파일에 자재명이 있으면 그 값이 resolvedName이 된다", () => {
+    const rows: BulkNewInputRow[] = [
+      {
+        mdg_code: "AAA111",
+        part_no: "P1",
+        manufacturer: "M1",
+        material_name: "파일 자재명",
+        size: "규격A",
+      },
+    ];
+    const result = buildBulkNewPreview(rows, []);
+    expect(result[0].status).toBe("new");
+    if (result[0].status === "new") {
+      expect(result[0].resolvedName).toBe("파일 자재명");
+      expect(result[0].resolvedSize).toBe("규격A");
+    }
+  });
+
+  it("파일에 자재명이 없고 같은 MDG코드 기존 행이 있으면 상속된다", () => {
+    const existing: BulkNewMaterialInfo[] = [
+      {
+        id: 3,
+        mdg_code: "BBB222",
+        part_no: "OLD-3",
+        manufacturer: "M9",
+        material_name: "상속될 이름",
+        size: "상속될 규격",
+      },
+    ];
+    const rows: BulkNewInputRow[] = [
+      { mdg_code: "BBB222", part_no: "NEW-3", manufacturer: "M9" },
+    ];
+    const result = buildBulkNewPreview(rows, existing);
+    expect(result[0].status).toBe("new");
+    if (result[0].status === "new") {
+      expect(result[0].resolvedName).toBe("상속될 이름");
+      expect(result[0].resolvedSize).toBe("상속될 규격");
+    }
+  });
+
+  it("자재명이 파일에도 없고 상속할 기존 행도 없으면 invalid (자재명 관련 사유)", () => {
+    const rows: BulkNewInputRow[] = [
+      { mdg_code: "CCC333", part_no: "P1", manufacturer: "M1" },
+    ];
+    const result = buildBulkNewPreview(rows, []);
+    expect(result).toEqual([
+      {
+        status: "invalid",
+        mdg_code: "CCC333",
+        part_no: "P1",
+        manufacturer: "M1",
+        reason:
+          "자재명이 없습니다. 엑셀에 자재명 열을 넣거나, 같은 MDG코드로 등록된 기존 자재가 있어야 합니다.",
+      },
+    ]);
+  });
+
+  it("파일 자재명이 기존 상속값보다 우선한다", () => {
+    const existing: BulkNewMaterialInfo[] = [
+      {
+        id: 4,
+        mdg_code: "DDD444",
+        part_no: "OLD-4",
+        manufacturer: "M8",
+        material_name: "기존 이름(상속 후보)",
+        size: "기존 규격",
+      },
+    ];
+    const rows: BulkNewInputRow[] = [
+      {
+        mdg_code: "DDD444",
+        part_no: "NEW-4",
+        manufacturer: "M8",
+        material_name: "파일 우선 이름",
+        size: "파일 우선 규격",
+      },
+    ];
+    const result = buildBulkNewPreview(rows, existing);
+    expect(result[0].status).toBe("new");
+    if (result[0].status === "new") {
+      expect(result[0].resolvedName).toBe("파일 우선 이름");
+      expect(result[0].resolvedSize).toBe("파일 우선 규격");
+    }
+  });
+
+  it("자재명이 없어도 already_registered가 먼저 걸리면 invalid가 아니라 already_registered", () => {
+    const existing: BulkNewMaterialInfo[] = [
+      {
+        id: 7,
+        mdg_code: "EEE555",
+        part_no: "P1",
+        manufacturer: "M1",
+        material_name: "이미 등록된 이름",
+        size: null,
+      },
+    ];
+    const rows: BulkNewInputRow[] = [
+      { mdg_code: "EEE555", part_no: "P1", manufacturer: "M1" },
+    ];
+    const result = buildBulkNewPreview(rows, existing);
+    expect(result[0].status).toBe("already_registered");
+  });
+
+  it("자재명이 없어도 duplicate_in_file이 먼저 걸리면 invalid가 아니라 duplicate_in_file", () => {
+    const rows: BulkNewInputRow[] = [
+      { mdg_code: "FFF666", part_no: "P1", manufacturer: "M1" },
+      { mdg_code: "FFF666", part_no: "P1", manufacturer: "M1" },
+    ];
+    const result = buildBulkNewPreview(rows, []);
+    expect(result[0].status).toBe("duplicate_in_file");
+    expect(result[1].status).toBe("duplicate_in_file");
   });
 });
 

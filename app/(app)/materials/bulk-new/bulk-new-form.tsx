@@ -211,9 +211,13 @@ export function BulkNewForm({ canEdit }: { canEdit: boolean }) {
             className="text-sm file:mr-3 file:rounded-md file:border file:bg-secondary file:px-3 file:py-1.5 file:text-sm file:font-medium disabled:opacity-50"
           />
           <p className="text-xs text-muted-foreground">
-            첫 행은 헤더여야 합니다. 헤더 행에 &quot;Manufacturer&quot;(제조사),
+            첫 행은 헤더여야 합니다. 필수 열은 &quot;Manufacturer&quot;(제조사),
             &quot;MDG Code&quot;(MDG코드), &quot;Part Number&quot;(Part No)
-            이름들이 포함된 열이 있어야 합니다.
+            입니다. &quot;Material Name&quot;(또는 &quot;Description&quot;,
+            자재명)과 &quot;Size&quot;(규격) 열은 선택입니다 — 넣으면 그 값을
+            쓰고, 비워두면 같은 MDG코드로 등록된 기존 자재에서 물려받습니다.
+            자재명이 파일에도 없고 물려받을 기존 자재도 없는 행은 등록되지
+            않습니다(자재명은 필수 항목입니다).
           </p>
         </div>
         <div>
@@ -262,16 +266,16 @@ export function BulkNewForm({ canEdit }: { canEdit: boolean }) {
               <PreviewTable
                 emptyMessage="신규 등록 대상 행이 없습니다."
                 rows={visibleSlice(newRows)}
-                columns={["MDG코드", "Part No", "제조사", "자재명(상속)", "규격(상속)"]}
+                columns={["MDG코드", "Part No", "제조사", "자재명", "규격"]}
                 renderRow={(row, i) => (
                   <TableRow key={`new-${row.mdg_code}-${i}`}>
                     <TableCell className="font-medium">{row.mdg_code}</TableCell>
                     <TableCell>{row.part_no || "-"}</TableCell>
                     <TableCell>{row.manufacturer || "-"}</TableCell>
                     <TableCell className="max-w-64 truncate">
-                      {row.inheritedName ?? "-"}
+                      {row.resolvedName}
                     </TableCell>
-                    <TableCell>{row.inheritedSize ?? "-"}</TableCell>
+                    <TableCell>{row.resolvedSize ?? "-"}</TableCell>
                   </TableRow>
                 )}
               />
