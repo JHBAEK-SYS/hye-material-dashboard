@@ -49,6 +49,7 @@ describe("parseBulkNewFile", () => {
         part_no: "041DI060",
         material_name: "",
         size: "",
+        unit: "",
       },
       {
         manufacturer: "Aeroflex",
@@ -56,6 +57,7 @@ describe("parseBulkNewFile", () => {
         part_no: "3MNEBST11034 (Aeroflex)",
         material_name: "",
         size: "",
+        unit: "",
       },
       {
         manufacturer: "Amphenol",
@@ -63,6 +65,7 @@ describe("parseBulkNewFile", () => {
         part_no: "AMP-001",
         material_name: "",
         size: "",
+        unit: "",
       },
     ]);
   });
@@ -80,6 +83,7 @@ describe("parseBulkNewFile", () => {
         part_no: "041DI060",
         material_name: "",
         size: "",
+        unit: "",
       },
     ]);
   });
@@ -97,6 +101,7 @@ describe("parseBulkNewFile", () => {
         part_no: "041DI060",
         material_name: "",
         size: "",
+        unit: "",
       },
     ]);
   });
@@ -114,6 +119,7 @@ describe("parseBulkNewFile", () => {
         part_no: "041DI060",
         material_name: "",
         size: "",
+        unit: "",
       },
     ]);
   });
@@ -134,6 +140,7 @@ describe("parseBulkNewFile", () => {
         part_no: "041DI060",
         material_name: "",
         size: "",
+        unit: "",
       },
       {
         manufacturer: "Aeroflex",
@@ -141,6 +148,7 @@ describe("parseBulkNewFile", () => {
         part_no: "3MNEBST11034 (Aeroflex)",
         material_name: "",
         size: "",
+        unit: "",
       },
     ]);
   });
@@ -158,6 +166,7 @@ describe("parseBulkNewFile", () => {
         part_no: "041DI060",
         material_name: "",
         size: "",
+        unit: "",
       },
     ]);
   });
@@ -224,6 +233,7 @@ describe("parseBulkNewFile", () => {
         part_no: "041DI060",
         material_name: "Foam Strip",
         size: "1/4 inch",
+        unit: "",
       },
     ]);
   });
@@ -241,6 +251,7 @@ describe("parseBulkNewFile", () => {
         part_no: "041DI060",
         material_name: "",
         size: "",
+        unit: "",
       },
     ]);
   });
@@ -258,6 +269,7 @@ describe("parseBulkNewFile", () => {
         manufacturer: "Above All",
         material_name: "Foam Strip",
         size: "",
+        unit: "",
       },
     ]);
   });
@@ -275,6 +287,93 @@ describe("parseBulkNewFile", () => {
         part_no: "041DI060",
         material_name: "폼 스트립",
         size: "",
+        unit: "",
+      },
+    ]);
+  });
+
+  it("Unit(단위) 열을 포함한 6열 전부 있는 파일을 파싱한다", async () => {
+    const buffer = await buildBuffer([
+      [
+        "Manufacturer",
+        "MDG Code",
+        "Part Number",
+        "Material Name",
+        "Size",
+        "Unit",
+      ],
+      ["Above All", "602731", "041DI060", "Foam Strip", "1/4 inch", "EA"],
+    ]);
+    const result = await parseBulkNewFile(buffer);
+    expect(result).toEqual([
+      {
+        manufacturer: "Above All",
+        mdg_code: "602731",
+        part_no: "041DI060",
+        material_name: "Foam Strip",
+        size: "1/4 inch",
+        unit: "EA",
+      },
+    ]);
+  });
+
+  it("Unit 열이 없는 기존 파일도 그대로 동작한다(unit은 빈 문자열)", async () => {
+    const buffer = await buildBuffer([
+      ["Manufacturer", "MDG Code", "Part Number", "Material Name", "Size"],
+      ["Above All", "602731", "041DI060", "Foam Strip", "1/4 inch"],
+    ]);
+    const result = await parseBulkNewFile(buffer);
+    expect(result).toEqual([
+      {
+        manufacturer: "Above All",
+        mdg_code: "602731",
+        part_no: "041DI060",
+        material_name: "Foam Strip",
+        size: "1/4 inch",
+        unit: "",
+      },
+    ]);
+  });
+
+  it("한글 '단위' 헤더도 단위 열로 인식한다", async () => {
+    const buffer = await buildBuffer([
+      ["제조사", "MDG코드", "품번", "품명", "규격", "단위"],
+      ["에이보올", "602731", "041DI060", "폼 스트립", "1/4 인치", "EA"],
+    ]);
+    const result = await parseBulkNewFile(buffer);
+    expect(result).toEqual([
+      {
+        manufacturer: "에이보올",
+        mdg_code: "602731",
+        part_no: "041DI060",
+        material_name: "폼 스트립",
+        size: "1/4 인치",
+        unit: "EA",
+      },
+    ]);
+  });
+
+  it("Unit과 다른 열(Manufacturer/Material Name/Size)이 서로 다른 열로 구분된다", async () => {
+    const buffer = await buildBuffer([
+      [
+        "Unit",
+        "MDG Code",
+        "Part Number",
+        "Manufacturer",
+        "Material Name",
+        "Size",
+      ],
+      ["EA", "602731", "041DI060", "Above All", "Foam Strip", "1/4 inch"],
+    ]);
+    const result = await parseBulkNewFile(buffer);
+    expect(result).toEqual([
+      {
+        mdg_code: "602731",
+        part_no: "041DI060",
+        manufacturer: "Above All",
+        material_name: "Foam Strip",
+        size: "1/4 inch",
+        unit: "EA",
       },
     ]);
   });

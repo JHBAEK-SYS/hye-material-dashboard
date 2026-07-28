@@ -782,7 +782,7 @@ export async function getAllMaterialsForBulkNew(): Promise<
     (from, to) =>
       supabase
         .from("materials")
-        .select("id, mdg_code, part_no, manufacturer, material_name, size")
+        .select("id, mdg_code, part_no, manufacturer, material_name, size, unit")
         .order("id", { ascending: true })
         .range(from, to),
     "자재 전체 조회 실패"

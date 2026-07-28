@@ -21,6 +21,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: null,
         material_name: "Foam Strip",
         size: null,
+        unit: null,
       },
     ];
     const rows: BulkNewInputRow[] = [
@@ -53,6 +54,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: "Steel O'Brien",
         material_name: "Lap Joint Flange Ring SS304",
         size: "1",
+        unit: null,
       },
     ];
     const rows: BulkNewInputRow[] = [
@@ -68,11 +70,12 @@ describe("buildBulkNewPreview", () => {
         manufacturer: "Steel O'Brien",
         resolvedName: "Lap Joint Flange Ring SS304",
         resolvedSize: "1",
+        resolvedUnit: null,
       },
     ]);
   });
 
-  it("완전히 동일한 조합이면 already_registered", () => {
+  it("완전히 동일한 조합이고 규격·단위가 이미 채워져 있으면 already_registered", () => {
     const existing: BulkNewMaterialInfo[] = [
       {
         id: 1,
@@ -81,6 +84,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: "Steel O'Brien",
         material_name: "Lap Joint Flange Ring SS304",
         size: "1",
+        unit: "EA",
       },
     ];
     const rows: BulkNewInputRow[] = [
@@ -107,7 +111,8 @@ describe("buildBulkNewPreview", () => {
         part_no: "NF5037C000",
         manufacturer: null,
         material_name: "테스트자재",
-        size: null,
+        size: "규격A",
+        unit: "EA",
       },
     ];
     const rows: BulkNewInputRow[] = [
@@ -130,6 +135,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: null,
         material_name: "Foam Strip",
         size: null,
+        unit: null,
       },
     ];
     const rows: BulkNewInputRow[] = [
@@ -179,6 +185,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: null,
         material_name: "후보B",
         size: null,
+        unit: null,
       },
       {
         id: 5,
@@ -187,6 +194,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: null,
         material_name: "후보A",
         size: null,
+        unit: null,
       },
     ];
     const rows: BulkNewInputRow[] = [
@@ -231,6 +239,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: "Steel O'Brien",
         material_name: "Lap Joint Flange Ring SS304",
         size: "1",
+        unit: "EA",
       },
     ];
     const rows: BulkNewInputRow[] = [
@@ -252,6 +261,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: null,
         material_name: "Foam Strip",
         size: null,
+        unit: null,
       },
     ];
     const rows: BulkNewInputRow[] = [
@@ -272,6 +282,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: "Any",
         resolvedName: "새 자재",
         resolvedSize: null,
+        resolvedUnit: null,
       },
     ]);
   });
@@ -294,6 +305,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: "M1",
         material_name: null,
         size: null,
+        unit: null,
       },
       {
         id: 2,
@@ -302,6 +314,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: "M2",
         material_name: "두번째 이름",
         size: "2",
+        unit: "EA",
       },
     ];
     const rows: BulkNewInputRow[] = [
@@ -313,6 +326,7 @@ describe("buildBulkNewPreview", () => {
     if (result[0].status === "new") {
       expect(result[0].resolvedName).toBe("두번째 이름");
       expect(result[0].resolvedSize).toBe("2");
+      expect(result[0].resolvedUnit).toBe("EA");
     }
   });
 
@@ -334,6 +348,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: "M1",
         resolvedName: "새 자재명",
         resolvedSize: null,
+        resolvedUnit: null,
       },
     ]);
   });
@@ -346,6 +361,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: "  M1  ",
         material_name: "  트림자재명  ",
         size: "  10mm  ",
+        unit: "  EA  ",
       },
     ];
     const result = buildBulkNewPreview(rows, []);
@@ -356,6 +372,7 @@ describe("buildBulkNewPreview", () => {
       manufacturer: "M1",
       resolvedName: "트림자재명",
       resolvedSize: "10mm",
+      resolvedUnit: "EA",
     });
   });
 
@@ -386,6 +403,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: "M9",
         material_name: "상속될 이름",
         size: "상속될 규격",
+        unit: "상속될 단위",
       },
     ];
     const rows: BulkNewInputRow[] = [
@@ -396,6 +414,7 @@ describe("buildBulkNewPreview", () => {
     if (result[0].status === "new") {
       expect(result[0].resolvedName).toBe("상속될 이름");
       expect(result[0].resolvedSize).toBe("상속될 규격");
+      expect(result[0].resolvedUnit).toBe("상속될 단위");
     }
   });
 
@@ -425,6 +444,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: "M8",
         material_name: "기존 이름(상속 후보)",
         size: "기존 규격",
+        unit: "기존 단위",
       },
     ];
     const rows: BulkNewInputRow[] = [
@@ -434,6 +454,7 @@ describe("buildBulkNewPreview", () => {
         manufacturer: "M8",
         material_name: "파일 우선 이름",
         size: "파일 우선 규격",
+        unit: "파일 우선 단위",
       },
     ];
     const result = buildBulkNewPreview(rows, existing);
@@ -441,6 +462,7 @@ describe("buildBulkNewPreview", () => {
     if (result[0].status === "new") {
       expect(result[0].resolvedName).toBe("파일 우선 이름");
       expect(result[0].resolvedSize).toBe("파일 우선 규격");
+      expect(result[0].resolvedUnit).toBe("파일 우선 단위");
     }
   });
 
@@ -452,7 +474,8 @@ describe("buildBulkNewPreview", () => {
         part_no: "P1",
         manufacturer: "M1",
         material_name: "이미 등록된 이름",
-        size: null,
+        size: "규격",
+        unit: "EA",
       },
     ];
     const rows: BulkNewInputRow[] = [
@@ -471,6 +494,204 @@ describe("buildBulkNewPreview", () => {
     expect(result[0].status).toBe("duplicate_in_file");
     expect(result[1].status).toBe("duplicate_in_file");
   });
+
+  // --- fill_spec: 빈 규격·단위만 채우고 기존 값은 절대 덮어쓰지 않는다 ---
+
+  describe("fill_spec (기존 조합 매칭 시 빈 규격·단위 채우기)", () => {
+    it("기존 규격·단위가 둘 다 비어 있고 파일에 둘 다 있으면 fill_spec으로 둘 다 채운다", () => {
+      const existing: BulkNewMaterialInfo[] = [
+        {
+          id: 100,
+          mdg_code: "AAA000",
+          part_no: "P1",
+          manufacturer: "M1",
+          material_name: "자재A",
+          size: null,
+          unit: null,
+        },
+      ];
+      const rows: BulkNewInputRow[] = [
+        {
+          mdg_code: "AAA000",
+          part_no: "P1",
+          manufacturer: "M1",
+          size: "10mm",
+          unit: "EA",
+        },
+      ];
+      const result = buildBulkNewPreview(rows, existing);
+      expect(result).toEqual([
+        {
+          status: "fill_spec",
+          mdg_code: "AAA000",
+          part_no: "P1",
+          manufacturer: "M1",
+          targetId: 100,
+          materialName: "자재A",
+          prevSize: null,
+          newSize: "10mm",
+          prevUnit: null,
+          newUnit: "EA",
+        },
+      ]);
+    });
+
+    it("기존 규격만 비어 있고 단위는 이미 있으면 규격만 채우고 단위는 건드리지 않는다", () => {
+      const existing: BulkNewMaterialInfo[] = [
+        {
+          id: 101,
+          mdg_code: "AAA001",
+          part_no: "P1",
+          manufacturer: "M1",
+          material_name: "자재B",
+          size: null,
+          unit: "EA",
+        },
+      ];
+      const rows: BulkNewInputRow[] = [
+        {
+          mdg_code: "AAA001",
+          part_no: "P1",
+          manufacturer: "M1",
+          size: "10mm",
+          unit: "BOX",
+        },
+      ];
+      const result = buildBulkNewPreview(rows, existing);
+      expect(result).toEqual([
+        {
+          status: "fill_spec",
+          mdg_code: "AAA001",
+          part_no: "P1",
+          manufacturer: "M1",
+          targetId: 101,
+          materialName: "자재B",
+          prevSize: null,
+          newSize: "10mm",
+          prevUnit: "EA",
+          newUnit: null,
+        },
+      ]);
+    });
+
+    it("기존 규격·단위가 이미 채워져 있으면 파일 값과 달라도 절대 덮어쓰지 않고 already_registered", () => {
+      const existing: BulkNewMaterialInfo[] = [
+        {
+          id: 102,
+          mdg_code: "AAA002",
+          part_no: "P1",
+          manufacturer: "M1",
+          material_name: "자재C",
+          size: "기존규격",
+          unit: "기존단위",
+        },
+      ];
+      const rows: BulkNewInputRow[] = [
+        {
+          mdg_code: "AAA002",
+          part_no: "P1",
+          manufacturer: "M1",
+          size: "다른규격",
+          unit: "다른단위",
+        },
+      ];
+      const result = buildBulkNewPreview(rows, existing);
+      expect(result).toEqual([
+        {
+          status: "already_registered",
+          mdg_code: "AAA002",
+          part_no: "P1",
+          manufacturer: "M1",
+          existingId: 102,
+        },
+      ]);
+    });
+
+    it("기존 규격·단위가 비어 있어도 파일에도 값이 없으면 already_registered", () => {
+      const existing: BulkNewMaterialInfo[] = [
+        {
+          id: 103,
+          mdg_code: "AAA003",
+          part_no: "P1",
+          manufacturer: "M1",
+          material_name: "자재D",
+          size: null,
+          unit: null,
+        },
+      ];
+      const rows: BulkNewInputRow[] = [
+        { mdg_code: "AAA003", part_no: "P1", manufacturer: "M1" },
+      ];
+      const result = buildBulkNewPreview(rows, existing);
+      expect(result).toEqual([
+        {
+          status: "already_registered",
+          mdg_code: "AAA003",
+          part_no: "P1",
+          manufacturer: "M1",
+          existingId: 103,
+        },
+      ]);
+    });
+
+    it("기존 규격이 빈 문자열(공백)이어도 비어있는 것으로 취급해 채운다", () => {
+      const existing: BulkNewMaterialInfo[] = [
+        {
+          id: 104,
+          mdg_code: "AAA004",
+          part_no: "P1",
+          manufacturer: "M1",
+          material_name: "자재E",
+          size: "   ",
+          unit: "",
+        },
+      ];
+      const rows: BulkNewInputRow[] = [
+        {
+          mdg_code: "AAA004",
+          part_no: "P1",
+          manufacturer: "M1",
+          size: "새규격",
+          unit: "새단위",
+        },
+      ];
+      const result = buildBulkNewPreview(rows, existing);
+      expect(result[0].status).toBe("fill_spec");
+      if (result[0].status === "fill_spec") {
+        expect(result[0].newSize).toBe("새규격");
+        expect(result[0].newUnit).toBe("새단위");
+      }
+    });
+
+    it("파일 규격·단위 값도 trim하여 채운다", () => {
+      const existing: BulkNewMaterialInfo[] = [
+        {
+          id: 105,
+          mdg_code: "AAA005",
+          part_no: "P1",
+          manufacturer: "M1",
+          material_name: "자재F",
+          size: null,
+          unit: null,
+        },
+      ];
+      const rows: BulkNewInputRow[] = [
+        {
+          mdg_code: "AAA005",
+          part_no: "P1",
+          manufacturer: "M1",
+          size: "  10mm  ",
+          unit: "  EA  ",
+        },
+      ];
+      const result = buildBulkNewPreview(rows, existing);
+      expect(result[0].status).toBe("fill_spec");
+      if (result[0].status === "fill_spec") {
+        expect(result[0].newSize).toBe("10mm");
+        expect(result[0].newUnit).toBe("EA");
+      }
+    });
+  });
 });
 
 describe("summarizeBulkNewPreview", () => {
@@ -480,6 +701,7 @@ describe("summarizeBulkNewPreview", () => {
       new: 0,
       fill_existing: 0,
       fill_ambiguous: 0,
+      fill_spec: 0,
       already_registered: 0,
       duplicate_in_file: 0,
       invalid: 0,
@@ -501,6 +723,27 @@ describe("summarizeBulkNewPreview", () => {
     expect(summary.new).toBe(0);
     expect(summary.fill_existing).toBe(0);
     expect(summary.fill_ambiguous).toBe(0);
+    expect(summary.fill_spec).toBe(0);
     expect(summary.already_registered).toBe(0);
+  });
+
+  it("fill_spec 건수를 집계한다", () => {
+    const existing: BulkNewMaterialInfo[] = [
+      {
+        id: 200,
+        mdg_code: "ZZZ000",
+        part_no: "P1",
+        manufacturer: "M1",
+        material_name: "자재Z",
+        size: null,
+        unit: null,
+      },
+    ];
+    const rows = buildBulkNewPreview(
+      [{ mdg_code: "ZZZ000", part_no: "P1", manufacturer: "M1", size: "10mm" }],
+      existing
+    );
+    const summary = summarizeBulkNewPreview(rows);
+    expect(summary.fill_spec).toBe(1);
   });
 });

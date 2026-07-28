@@ -85,7 +85,13 @@ export type BulkNewCommitResult =
   | {
       ok: true;
       message: string;
-      summary: { inserted: number; filled: number; failed: number; skipped: number };
+      summary: {
+        inserted: number;
+        filled: number;
+        filledSpec: number;
+        failed: number;
+        skipped: number;
+      };
       failures: BulkNewCommitFailure[];
     };
 
@@ -99,11 +105,14 @@ function isValidInputRow(v: unknown): v is BulkNewInputRow {
   ) {
     return false;
   }
-  // material_name/size는 선택 속성 — 있으면 string이어야 하고, 없어도 통과.
+  // material_name/size/unit은 선택 속성 — 있으면 string이어야 하고, 없어도 통과.
   if (r.material_name !== undefined && typeof r.material_name !== "string") {
     return false;
   }
   if (r.size !== undefined && typeof r.size !== "string") {
+    return false;
+  }
+  if (r.unit !== undefined && typeof r.unit !== "string") {
     return false;
   }
   return true;
@@ -143,6 +152,11 @@ function chunk<T>(items: T[], size: number): T[][] {
  *   포함된 경우에만 materials UPDATE { mdg_code } WHERE id = targetId.
  *   포함되어 있지 않으면 건너뛴다(skipped) — 기본은 사용자가 화면에서 직접
  *   체크한 것만 반영.
+ * - status === "fill_spec" 인 행은 승인 목록 없이 기본으로 전부 반영한다 —
+ *   buildBulkNewPreview가 이미 "빈 규격/단위만 채운다"를 보장하므로 기존
+ *   값을 덮어쓸 위험이 없어 fill_existing과 달리 사용자 체크가 필요 없다.
+ *   payload에는 newSize/newUnit이 null이 아닌 컬럼만 넣는다 — null인 채로
+ *   넣으면 UPDATE가 그 컬럼을 null로 지워버리기 때문이다.
  * - 그 외 상태(already_registered/duplicate_in_file/fill_ambiguous/invalid)는
  *   전부 skipped.
  */
@@ -180,6 +194,7 @@ export async function commitBulkNew(
 
   let inserted = 0;
   let filled = 0;
+  let filledSpec = 0;
   let failed = 0;
   const failures: BulkNewCommitFailure[] = [];
 
@@ -196,6 +211,7 @@ export async function commitBulkNew(
       manufacturer: r.manufacturer || null,
       material_name: r.resolvedName, // NOT NULL — buildBulkNewPreview가 항상 비어있지 않게 보장
       size: r.resolvedSize,
+      unit: r.resolvedUnit,
       safety_stock: 0,
       opening_stock: 0,
       is_active: true,
@@ -272,19 +288,61 @@ export async function commitBulkNew(
     filled++;
   }
 
-  const skipped = preview.length - inserted - filled - failed;
+  // --- 규격·단위 채우기: status === "fill_spec" (빈 칸만 채우므로 기본 반영) ---
+  const specRows = preview.filter(
+    (r): r is Extract<BulkNewPreviewRow, { status: "fill_spec" }> =>
+      r.status === "fill_spec"
+  );
+  for (const r of specRows) {
+    // null인 컬럼은 payload에 넣지 않는다 — 넣으면 UPDATE가 기존 값을 지운다.
+    const updatePayload: Record<string, string> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (r.newSize !== null) updatePayload.size = r.newSize;
+    if (r.newUnit !== null) updatePayload.unit = r.newUnit;
 
-  if (inserted > 0 || filled > 0) {
+    const { data, error } = await supabase
+      .from("materials")
+      .update(updatePayload)
+      .eq("id", r.targetId)
+      .select();
+
+    if (error) {
+      failed++;
+      failures.push({
+        mdg_code: r.mdg_code,
+        part_no: r.part_no,
+        reason: `규격·단위 채우기 실패: ${error.message}`,
+      });
+      continue;
+    }
+    if (!data || data.length === 0) {
+      failed++;
+      failures.push({
+        mdg_code: r.mdg_code,
+        part_no: r.part_no,
+        reason:
+          "저장이 반영되지 않았습니다. materials 테이블에 authenticated UPDATE 정책이 필요합니다.",
+      });
+      continue;
+    }
+
+    filledSpec++;
+  }
+
+  const skipped = preview.length - inserted - filled - filledSpec - failed;
+
+  if (inserted > 0 || filled > 0 || filledSpec > 0) {
     revalidatePath("/materials");
     revalidatePath("/dashboard");
   }
 
-  const message = `신규 ${inserted}건 등록, 기존 ${filled}건 채움, ${failed}건 실패, ${skipped}건 제외`;
+  const message = `신규 ${inserted}건 등록, 규격·단위 ${filledSpec}건 채움, 기존 ${filled}건 채움, ${failed}건 실패, ${skipped}건 제외`;
 
   return {
     ok: true,
     message,
-    summary: { inserted, filled, failed, skipped },
+    summary: { inserted, filled, filledSpec, failed, skipped },
     failures,
   };
 }

@@ -16,11 +16,13 @@ export default async function MaterialsBulkNewPage() {
           </h1>
           <p className="text-sm text-muted-foreground">
             자재 목록 엑셀(필수: Manufacturer / MDG Code / Part Number, 선택:
-            Material Name / Size 열 포함)을 업로드하면 신규 자재와 기존
-            행(Part No만 있고 MDG코드가 비어 있는 행) 채우기 대상을 구분해
-            미리보기로 보여줍니다. 자재명이 파일에도 없고 같은 MDG코드의
-            기존 자재도 없는 행은 오류로 표시되어 등록되지 않습니다. 반영
-            전 미리보기에서 결과를 확인하세요.
+            Material Name / Size / Unit(단위) 열 포함)을 업로드하면 신규
+            자재와 기존 행(Part No만 있고 MDG코드가 비어 있는 행) 채우기
+            대상을 구분해 미리보기로 보여줍니다. 이미 등록된 자재는 비어
+            있는 규격·단위만 채우고 기존 값은 덮어쓰지 않습니다. 자재명이
+            파일에도 없고 같은 MDG코드의 기존 자재도 없는 행은 오류로
+            표시되어 등록되지 않습니다. 반영 전 미리보기에서 결과를
+            확인하세요.
           </p>
         </div>
         <Link

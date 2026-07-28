@@ -44,6 +44,7 @@ type FillAmbiguousRow = Extract<
   BulkNewPreviewRow,
   { status: "fill_ambiguous" }
 >;
+type FillSpecRow = Extract<BulkNewPreviewRow, { status: "fill_spec" }>;
 type AlreadyRegisteredRow = Extract<
   BulkNewPreviewRow,
   { status: "already_registered" }
@@ -183,12 +184,17 @@ export function BulkNewForm({ canEdit }: { canEdit: boolean }) {
     (previewData?.preview.filter(
       (r): r is FillAmbiguousRow => r.status === "fill_ambiguous"
     ) as FillAmbiguousRow[]) ?? [];
+  const specRows: FillSpecRow[] =
+    (previewData?.preview.filter(
+      (r): r is FillSpecRow => r.status === "fill_spec"
+    ) as FillSpecRow[]) ?? [];
   const invalidRows: InvalidRow[] =
     (previewData?.preview.filter(
       (r): r is InvalidRow => r.status === "invalid"
     ) as InvalidRow[]) ?? [];
 
-  const applyTotal = (summary?.new ?? 0) + checkedCount;
+  const applyTotal =
+    (summary?.new ?? 0) + checkedCount + (summary?.fill_spec ?? 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -214,10 +220,12 @@ export function BulkNewForm({ canEdit }: { canEdit: boolean }) {
             첫 행은 헤더여야 합니다. 필수 열은 &quot;Manufacturer&quot;(제조사),
             &quot;MDG Code&quot;(MDG코드), &quot;Part Number&quot;(Part No)
             입니다. &quot;Material Name&quot;(또는 &quot;Description&quot;,
-            자재명)과 &quot;Size&quot;(규격) 열은 선택입니다 — 넣으면 그 값을
-            쓰고, 비워두면 같은 MDG코드로 등록된 기존 자재에서 물려받습니다.
-            자재명이 파일에도 없고 물려받을 기존 자재도 없는 행은 등록되지
-            않습니다(자재명은 필수 항목입니다).
+            자재명), &quot;Size&quot;(규격), &quot;Unit&quot;(단위) 열은
+            선택입니다 — 넣으면 그 값을 쓰고, 비워두면 같은 MDG코드로 등록된
+            기존 자재에서 물려받습니다. 자재명이 파일에도 없고 물려받을 기존
+            자재도 없는 행은 등록되지 않습니다(자재명은 필수 항목입니다).
+            이미 등록된 자재는 비어 있는 규격·단위만 채우고 기존 값은
+            덮어쓰지 않습니다.
           </p>
         </div>
         <div>
@@ -240,6 +248,9 @@ export function BulkNewForm({ canEdit }: { canEdit: boolean }) {
             <div className="flex flex-wrap items-center gap-2 rounded-lg border p-4 text-sm">
               <span className="inline-flex items-center gap-1 rounded-full border bg-secondary px-2.5 py-1 font-medium">
                 신규 등록 {num(summary.new)}건
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border bg-secondary px-2.5 py-1 font-medium">
+                규격·단위 채움 {num(summary.fill_spec)}건
               </span>
               <span className="inline-flex items-center gap-1 rounded-full border bg-secondary px-2.5 py-1 font-medium">
                 기존 행에 MDG코드 채움 {num(summary.fill_existing)}건
@@ -266,7 +277,7 @@ export function BulkNewForm({ canEdit }: { canEdit: boolean }) {
               <PreviewTable
                 emptyMessage="신규 등록 대상 행이 없습니다."
                 rows={visibleSlice(newRows)}
-                columns={["MDG코드", "Part No", "제조사", "자재명", "규격"]}
+                columns={["MDG코드", "Part No", "제조사", "자재명", "규격", "단위"]}
                 renderRow={(row, i) => (
                   <TableRow key={`new-${row.mdg_code}-${i}`}>
                     <TableCell className="font-medium">{row.mdg_code}</TableCell>
@@ -276,6 +287,43 @@ export function BulkNewForm({ canEdit }: { canEdit: boolean }) {
                       {row.resolvedName}
                     </TableCell>
                     <TableCell>{row.resolvedSize ?? "-"}</TableCell>
+                    <TableCell>{row.resolvedUnit ?? "-"}</TableCell>
+                  </TableRow>
+                )}
+              />
+            </div>
+
+            {/* 규격·단위 채움 (빈 칸만 채우므로 기본 반영 — 체크박스 없음) */}
+            <div className="flex flex-col gap-2">
+              <h2 className="text-sm font-semibold">
+                규격·단위 채움 ({num(specRows.length)}건)
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                기존 자재의 빈 규격·단위만 채웁니다. 이미 값이 있는 항목은
+                덮어쓰지 않으며, 별도 선택 없이 확정 시 자동으로 반영됩니다.
+              </p>
+              <PreviewTable
+                emptyMessage="규격·단위 채움 대상 행이 없습니다."
+                rows={visibleSlice(specRows)}
+                columns={["MDG코드", "Part No", "제조사", "자재명", "규격(기존→새값)", "단위(기존→새값)"]}
+                renderRow={(row, i) => (
+                  <TableRow key={`spec-${row.mdg_code}-${i}`}>
+                    <TableCell className="font-medium">{row.mdg_code}</TableCell>
+                    <TableCell>{row.part_no || "-"}</TableCell>
+                    <TableCell>{row.manufacturer || "-"}</TableCell>
+                    <TableCell className="max-w-64 truncate">
+                      {row.materialName ?? "-"}
+                    </TableCell>
+                    <TableCell>
+                      {row.newSize !== null
+                        ? `${row.prevSize ?? "-"} → ${row.newSize}`
+                        : "-"}
+                    </TableCell>
+                    <TableCell>
+                      {row.newUnit !== null
+                        ? `${row.prevUnit ?? "-"} → ${row.newUnit}`
+                        : "-"}
+                    </TableCell>
                   </TableRow>
                 )}
               />
@@ -489,9 +537,9 @@ export function BulkNewForm({ canEdit }: { canEdit: boolean }) {
                 >
                   {commitLoading
                     ? "반영 중…"
-                    : `신규 ${num(summary.new)}건 등록 + 기존 ${num(
-                        checkedCount
-                      )}건 채우기`}
+                    : `신규 ${num(summary.new)}건 등록 + 규격·단위 ${num(
+                        summary.fill_spec
+                      )}건 채움 + 기존 ${num(checkedCount)}건 채우기`}
                 </Button>
               </div>
               {commitError ? (
