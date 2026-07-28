@@ -90,7 +90,9 @@ export type BulkAdjustCommitResult =
 function isValidInputRow(v: unknown): v is BulkAdjustInputRow {
   if (typeof v !== "object" || v === null) return false;
   const r = v as Record<string, unknown>;
-  return typeof r.mdg_code === "string" && typeof r.qty === "string";
+  if (typeof r.mdg_code !== "string" || typeof r.qty !== "string") return false;
+  if (r.part_no !== undefined && typeof r.part_no !== "string") return false;
+  return true;
 }
 
 // 상세 페이지까지 revalidatePath 하는 개수 상한. 이보다 많으면 목록/대시보드
@@ -140,19 +142,13 @@ export async function commitBulkAdjust(
   for (const result of preview) {
     if (result.status !== "ok") continue;
 
-    const material = materialsMap.get(result.mdg_code);
-    if (!material) {
-      // 이론상 buildBulkAdjustPreview가 ok를 반환했다면 materialsMap에 있어야 하지만
-      // 방어적으로 처리한다.
-      failed++;
-      failures.push({ mdg_code: result.mdg_code, reason: "자재 정보를 다시 찾을 수 없습니다." });
-      continue;
-    }
-
+    // materialsMap에서 mdg_code로 다시 찾지 않는다 — mdg_code는 유니크가
+    // 아니라 여러 자재가 걸릴 수 있으므로, buildBulkAdjustPreview가 이미
+    // part_no로 확정한 자재의 id를 그대로 쓴다.
     const { data, error } = await supabase
       .from("materials")
       .update({ opening_stock: result.newOpeningStock })
-      .eq("id", material.id)
+      .eq("id", result.id)
       .select();
 
     if (error) {
@@ -170,7 +166,7 @@ export async function commitBulkAdjust(
     }
 
     applied++;
-    revalidateIds.push(material.id);
+    revalidateIds.push(result.id);
   }
 
   const skipped = preview.length - applied - failed;

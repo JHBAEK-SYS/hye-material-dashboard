@@ -37,8 +37,8 @@ type PreviewSuccess = {
 const LARGE_TABLE_THRESHOLD = 500;
 
 const EXCLUDED_REASON: Record<"not_found" | "duplicate", string> = {
-  not_found: "자재를 찾을 수 없습니다 (MDG코드 확인 필요)",
-  duplicate: "파일 안에 같은 MDG코드가 중복 등장함",
+  not_found: "자재를 찾을 수 없습니다 (MDG코드·Part No 확인 필요)",
+  duplicate: "파일 안에 같은 MDG코드·Part No 조합이 중복 등장함",
 };
 
 export function BulkAdjustForm({ canEdit }: { canEdit: boolean }) {
@@ -110,8 +110,13 @@ export function BulkAdjustForm({ canEdit }: { canEdit: boolean }) {
 
   const okRows =
     previewData?.preview.filter((r) => r.status === "ok") ?? [];
-  const excludedRows =
-    previewData?.preview.filter((r) => r.status !== "ok") ?? [];
+  const ambiguousRows =
+    previewData?.preview.filter((r) => r.status === "ambiguous") ?? [];
+  const otherExcludedRows =
+    previewData?.preview.filter(
+      (r) => r.status !== "ok" && r.status !== "ambiguous"
+    ) ?? [];
+  const excludedCount = ambiguousRows.length + otherExcludedRows.length;
   const negativeCount = okRows.filter(
     (r) => r.status === "ok" && r.negativeWarning
   ).length;
@@ -139,6 +144,12 @@ export function BulkAdjustForm({ canEdit }: { canEdit: boolean }) {
           <p className="text-xs text-muted-foreground">
             첫 행은 헤더여야 합니다. 헤더 텍스트에 &quot;MDG&quot;가 포함된 열을
             MDG코드 열로, &quot;수량&quot;이 포함된 열을 실사수량 열로 인식합니다.
+            &quot;Part No&quot;(또는 &quot;품번&quot;) 열은 선택이며, 같은
+            MDG코드로 등록된 자재가 2건 이상일 때 구분하는 용도로만 필요합니다.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            비활성 처리된 자재는 실사 조정 대상이 아닙니다 — 업로드 결과에
+            반영되지 않습니다.
           </p>
         </div>
         <div>
@@ -160,12 +171,18 @@ export function BulkAdjustForm({ canEdit }: { canEdit: boolean }) {
             {/* 요약 */}
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border p-4 text-sm">
               <span className="font-medium">
-                적용 대상 {num(okRows.length)}건 / 제외 {num(excludedRows.length)}건
+                적용 대상 {num(okRows.length)}건 / 제외 {num(excludedCount)}건
               </span>
               {negativeCount > 0 ? (
                 <span className="inline-flex items-center gap-1 font-semibold text-destructive">
                   <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
                   그중 음수 경고 {num(negativeCount)}건
+                </span>
+              ) : null}
+              {ambiguousRows.length > 0 ? (
+                <span className="inline-flex items-center gap-1 font-semibold text-destructive">
+                  <CircleAlert className="size-4 shrink-0" aria-hidden="true" />
+                  구분 불가 {num(ambiguousRows.length)}건
                 </span>
               ) : null}
             </div>
@@ -186,6 +203,7 @@ export function BulkAdjustForm({ canEdit }: { canEdit: boolean }) {
                   <TableHeader>
                     <TableRow>
                       <TableHead>MDG코드</TableHead>
+                      <TableHead>Part No</TableHead>
                       <TableHead>자재명</TableHead>
                       <TableHead className="text-right">현재고(전)</TableHead>
                       <TableHead className="text-right">실사수량(입력)</TableHead>
@@ -196,7 +214,7 @@ export function BulkAdjustForm({ canEdit }: { canEdit: boolean }) {
                     {okRows.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={5}
+                          colSpan={6}
                           className="h-16 text-center text-muted-foreground"
                         >
                           적용 대상 행이 없습니다.
@@ -210,6 +228,7 @@ export function BulkAdjustForm({ canEdit }: { canEdit: boolean }) {
                             <TableCell className="font-medium">
                               {row.mdg_code}
                             </TableCell>
+                            <TableCell>{row.part_no ?? "-"}</TableCell>
                             <TableCell className="max-w-64 truncate">
                               {row.material_name ?? "-"}
                             </TableCell>
@@ -242,15 +261,77 @@ export function BulkAdjustForm({ canEdit }: { canEdit: boolean }) {
               </div>
             </div>
 
-            {/* 제외 */}
-            {excludedRows.length > 0 ? (
+            {/* 구분 불가 (ambiguous) — 같은 MDG코드에 자재가 여러 개라 Part No로 좁혀야 함 */}
+            {ambiguousRows.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <h2 className="text-sm font-semibold text-destructive">
+                  구분 불가 ({num(ambiguousRows.length)}건)
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  같은 MDG코드로 등록된 자재가 여러 건이라 어느 자재인지 확정할
+                  수 없습니다. 엑셀에 Part No 열을 추가해 아래 후보 중 하나로
+                  좁혀 다시 업로드하세요.
+                </p>
+                <div
+                  className={
+                    ambiguousRows.length > LARGE_TABLE_THRESHOLD
+                      ? "max-h-[24rem] overflow-y-auto rounded-lg border"
+                      : "rounded-lg border"
+                  }
+                >
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>MDG코드</TableHead>
+                        <TableHead>입력 수량</TableHead>
+                        <TableHead>후보 (Part No · 제조사 · 자재명)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ambiguousRows.map((row, i) => {
+                        if (row.status !== "ambiguous") return null;
+                        return (
+                          <TableRow key={`${row.mdg_code}-${i}`}>
+                            <TableCell className="font-medium">
+                              {row.mdg_code}
+                            </TableCell>
+                            <TableCell>{row.qty || "(빈 값)"}</TableCell>
+                            <TableCell className="whitespace-normal text-muted-foreground">
+                              <ul className="flex flex-col gap-1">
+                                {row.candidates.map((c) => (
+                                  <li
+                                    key={c.id}
+                                    className="inline-flex items-center gap-1.5"
+                                  >
+                                    <CircleAlert
+                                      className="size-3.5 shrink-0"
+                                      aria-hidden="true"
+                                    />
+                                    {c.part_no ?? "(Part No 없음)"} ·{" "}
+                                    {c.manufacturer ?? "-"} ·{" "}
+                                    {c.material_name ?? "-"}
+                                  </li>
+                                ))}
+                              </ul>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ) : null}
+
+            {/* 그 외 제외 (not_found / duplicate / invalid_qty) */}
+            {otherExcludedRows.length > 0 ? (
               <div className="flex flex-col gap-2">
                 <h2 className="text-sm font-semibold">
-                  적용되지 않음 ({num(excludedRows.length)}건)
+                  적용되지 않음 ({num(otherExcludedRows.length)}건)
                 </h2>
                 <div
                   className={
-                    excludedRows.length > LARGE_TABLE_THRESHOLD
+                    otherExcludedRows.length > LARGE_TABLE_THRESHOLD
                       ? "max-h-[24rem] overflow-y-auto rounded-lg border"
                       : "rounded-lg border"
                   }
@@ -264,7 +345,7 @@ export function BulkAdjustForm({ canEdit }: { canEdit: boolean }) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {excludedRows.map((row, i) => {
+                      {otherExcludedRows.map((row, i) => {
                         const reason =
                           row.status === "invalid_qty"
                             ? row.reason

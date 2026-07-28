@@ -714,15 +714,25 @@ const IN_CHUNK_SIZE = 500;
 
 /**
  * mdg_code 목록(중복/공백 허용)을 받아 v_stock_status 를 배치 조회하고,
- * trim된 mdg_code -> StockStatusRow Map으로 반환한다.
- * 존재하지 않는 mdg_code는 그냥 Map에 없는 것으로 처리한다(호출부에서
- * not_found 판정에 사용).
+ * trim된 mdg_code -> StockStatusRow[] Map으로 반환한다.
+ * mdg_code는 materials 테이블에 유니크 제약이 없어(Part No가 다른 별개
+ * 자재가 같은 코드를 가질 수 있다) 코드당 여러 행이 나올 수 있으므로 배열로
+ * 반환한다 — 호출부(buildBulkAdjustPreview)가 후보 개수에 따라 not_found/
+ * ambiguous/ok를 판정한다. 존재하지 않는 mdg_code는 그냥 Map에 없는 것으로
+ * 처리한다.
+ *
+ * is_active=true 인 자재만 조회한다 — 비활성 자재는 의도적으로 꺼둔
+ * 것이라 실사 조정 대상이 아니고, 조회 범위를 좁히면 불필요한 ambiguous
+ * 판정도 줄어든다.
+ *
+ * 같은 mdg_code의 후보 배열은 id 오름차순으로 정렬해 candidates 표시
+ * 순서가 매번 같게 한다.
  */
 export async function getStockStatusByMdgCodes(
   mdgCodes: string[]
-): Promise<Map<string, StockStatusRow>> {
+): Promise<Map<string, StockStatusRow[]>> {
   const supabase = await createClient();
-  const map = new Map<string, StockStatusRow>();
+  const map = new Map<string, StockStatusRow[]>();
 
   const uniqueCodes = [
     ...new Set(
@@ -737,6 +747,7 @@ export async function getStockStatusByMdgCodes(
     const { data, error } = await supabase
       .from("v_stock_status")
       .select("*")
+      .eq("is_active", true)
       .in("mdg_code", chunk);
 
     if (error) {
@@ -745,9 +756,19 @@ export async function getStockStatusByMdgCodes(
 
     for (const row of (data ?? []) as StockStatusRow[]) {
       if (row.mdg_code) {
-        map.set(row.mdg_code.trim(), row);
+        const code = row.mdg_code.trim();
+        const existing = map.get(code);
+        if (existing) {
+          existing.push(row);
+        } else {
+          map.set(code, [row]);
+        }
       }
     }
+  }
+
+  for (const rows of map.values()) {
+    rows.sort((a, b) => a.id - b.id);
   }
 
   return map;

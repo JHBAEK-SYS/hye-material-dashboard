@@ -137,4 +137,59 @@ describe("parseBulkAdjustFile", () => {
     const result = await parseBulkAdjustFile(buffer);
     expect(result).toEqual([{ mdg_code: "536691", qty: "10" }]);
   });
+
+  // --- Part No 열 (선택) ---
+
+  it("Part No 열이 있으면 part_no를 채워 반환한다", async () => {
+    const buffer = await buildBuffer([
+      ["MDG코드", "수량", "Part No"],
+      ["536691", 125, "ABC-123"],
+    ]);
+    const result = await parseBulkAdjustFile(buffer);
+    expect(result).toEqual([
+      { mdg_code: "536691", qty: "125", part_no: "ABC-123" },
+    ]);
+  });
+
+  it("Part No 열이 없는 기존 파일도 그대로 동작한다(part_no 속성 자체가 없음)", async () => {
+    const buffer = await buildBuffer([
+      ["MDG코드", "수량"],
+      ["536691", 125],
+    ]);
+    const result = await parseBulkAdjustFile(buffer);
+    expect(result).toEqual([{ mdg_code: "536691", qty: "125" }]);
+  });
+
+  it("한글 '품번' 헤더도 Part No 열로 인식한다", async () => {
+    const buffer = await buildBuffer([
+      ["MDG코드", "수량", "품번"],
+      ["536691", 10, "XYZ-1"],
+    ]);
+    const result = await parseBulkAdjustFile(buffer);
+    expect(result).toEqual([
+      { mdg_code: "536691", qty: "10", part_no: "XYZ-1" },
+    ]);
+  });
+
+  it("Part No 열과 수량 열이 서로 다른 열로 인식된다(품번이 수량 탐지를 가로채지 않는다)", async () => {
+    const buffer = await buildBuffer([
+      ["MDG코드", "품번", "실사수량"],
+      ["536691", "PART-9", 30],
+    ]);
+    const result = await parseBulkAdjustFile(buffer);
+    expect(result).toEqual([
+      { mdg_code: "536691", qty: "30", part_no: "PART-9" },
+    ]);
+  });
+
+  it("Part No 셀 값의 앞뒤 공백도 trim한다", async () => {
+    const buffer = await buildBuffer([
+      ["MDG코드", "수량", "PART NO"],
+      ["536691", 10, "  ABC-1  "],
+    ]);
+    const result = await parseBulkAdjustFile(buffer);
+    expect(result).toEqual([
+      { mdg_code: "536691", qty: "10", part_no: "ABC-1" },
+    ]);
+  });
 });

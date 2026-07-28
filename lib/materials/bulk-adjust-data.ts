@@ -11,18 +11,23 @@ import { getStockStatusByMdgCodes } from "@/lib/supabase/queries";
  */
 export async function fetchBulkAdjustMaterialsMap(
   mdgCodes: string[]
-): Promise<Map<string, BulkAdjustMaterialInfo>> {
+): Promise<Map<string, BulkAdjustMaterialInfo[]>> {
   const stockMap = await getStockStatusByMdgCodes(mdgCodes);
-  const map = new Map<string, BulkAdjustMaterialInfo>();
-  for (const [code, row] of stockMap) {
-    map.set(code, {
-      id: row.id,
-      material_name: row.material_name,
-      opening_stock: row.opening_stock,
-      in_total: row.in_total,
-      out_total: row.out_total,
-      current_stock: row.current_stock,
-    });
+  const map = new Map<string, BulkAdjustMaterialInfo[]>();
+  for (const [code, rows] of stockMap) {
+    map.set(
+      code,
+      rows.map((row) => ({
+        id: row.id,
+        material_name: row.material_name,
+        part_no: row.part_no,
+        manufacturer: row.manufacturer,
+        opening_stock: row.opening_stock,
+        in_total: row.in_total,
+        out_total: row.out_total,
+        current_stock: row.current_stock,
+      }))
+    );
   }
   return map;
 }

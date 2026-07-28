@@ -26,13 +26,18 @@ function normalizeCell(value: ExcelJS.CellValue): string {
 }
 
 /**
- * 업로드된 .xlsx 버퍼를 파싱해 실사 결과(MDG코드·실사수량) 원본 행 배열로
- * 변환한다. 검증/역산은 하지 않는다(순수 파싱만) — buildBulkAdjustPreview
+ * 업로드된 .xlsx 버퍼를 파싱해 실사 결과(MDG코드·실사수량[·Part No]) 원본 행
+ * 배열로 변환한다. 검증/역산은 하지 않는다(순수 파싱만) — buildBulkAdjustPreview
  * 에서 이 결과를 받아 처리한다.
  *
  * - 첫 번째 비어있지 않은 행을 헤더로 본다.
  * - 헤더 텍스트에 "MDG"가 포함된 열을 mdg_code 열로, "수량"이 포함된 열을
  *   qty 열로 찾는다 (trim, 대소문자 무시). 둘 중 하나라도 못 찾으면 에러.
+ * - "PART" 또는 "품번"이 포함된 열을 part_no 열로 찾는다(대소문자 무시) —
+ *   선택 열이라 없어도 에러를 던지지 않고 각 행의 part_no를 빈 문자열로
+ *   채운다. mdg_code/qty와 마찬가지로 이미 다른 용도로 잡힌 열 번호는
+ *   재사용하지 않는다(claimedCols) — 예를 들어 "수량"으로 이미 잡힌 열은
+ *   part_no 열로 다시 잡히지 않는다.
  * - 헤더 다음 행부터 순회하며 mdg_code 셀이 비어있으면 그 행에서 멈춘다.
  */
 export async function parseBulkAdjustFile(
@@ -66,15 +71,33 @@ export async function parseBulkAdjustFile(
   const headerTexts: string[] = [];
   let mdgColIndex: number | null = null;
   let qtyColIndex: number | null = null;
+  let partColIndex: number | null = null;
+  // 한 열 번호가 두 용도로 겹쳐 잡히지 않도록(예: "품번"이 "수량" 탐지와
+  // 충돌하지 않도록) 이미 다른 필드에 배정된 열 번호는 재사용하지 않는다.
+  const claimedCols = new Set<number>();
 
   headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
     const text = normalizeCell(cell.value).trim();
     headerTexts.push(text);
-    if (mdgColIndex === null && text.toUpperCase().includes("MDG")) {
+    const upper = text.toUpperCase();
+
+    if (mdgColIndex === null && !claimedCols.has(colNumber) && upper.includes("MDG")) {
       mdgColIndex = colNumber;
+      claimedCols.add(colNumber);
+      return;
     }
-    if (qtyColIndex === null && text.includes("수량")) {
+    if (qtyColIndex === null && !claimedCols.has(colNumber) && text.includes("수량")) {
       qtyColIndex = colNumber;
+      claimedCols.add(colNumber);
+      return;
+    }
+    if (
+      partColIndex === null &&
+      !claimedCols.has(colNumber) &&
+      (upper.includes("PART") || text.includes("품번"))
+    ) {
+      partColIndex = colNumber;
+      claimedCols.add(colNumber);
     }
   });
 
@@ -91,7 +114,11 @@ export async function parseBulkAdjustFile(
     const mdgText = normalizeCell(row.getCell(mdgColIndex).value).trim();
     if (mdgText === "") break;
     const qtyText = normalizeCell(row.getCell(qtyColIndex).value).trim();
-    rows.push({ mdg_code: mdgText, qty: qtyText });
+    const inputRow: BulkAdjustInputRow = { mdg_code: mdgText, qty: qtyText };
+    if (partColIndex !== null) {
+      inputRow.part_no = normalizeCell(row.getCell(partColIndex).value).trim();
+    }
+    rows.push(inputRow);
   }
 
   return rows;
