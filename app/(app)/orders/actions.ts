@@ -8,6 +8,10 @@ import {
   remainingQty,
   validateReceiveInput,
 } from "@/lib/receive/validate";
+import {
+  resolveMaterialsForLines,
+  type MaterialCandidate,
+} from "@/lib/materials/resolve-material";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "@/lib/form-state";
 
@@ -30,13 +34,14 @@ export async function createPurchaseOrder(
 
   const mdgCodes = formData.getAll("mdg_code").map((v) => String(v).trim());
   const qtys = formData.getAll("qty").map((v) => String(v).trim());
+  const partNos = formData.getAll("part_no").map((v) => String(v).trim());
 
   if (!po_no || !order_date || !vendor) {
     return { error: "발주번호·발주일·거래처는 필수입니다.", message: null };
   }
 
   // 품목 줄 취합 (빈 줄 건너뜀)
-  const lines: { mdg_code: string; qty: number }[] = [];
+  const lines: { mdg_code: string; qty: number; part_no?: string }[] = [];
   for (let i = 0; i < mdgCodes.length; i++) {
     const code = mdgCodes[i];
     if (!code) continue;
@@ -44,45 +49,51 @@ export async function createPurchaseOrder(
     if (!Number.isFinite(qty) || qty <= 0) {
       return { error: `'${code}' 품목의 수량이 올바르지 않습니다.`, message: null };
     }
-    lines.push({ mdg_code: code, qty });
+    lines.push({ mdg_code: code, qty, part_no: partNos[i] });
   }
   if (lines.length === 0) {
     return { error: "품목(MDG코드)을 1개 이상 입력하세요.", message: null };
   }
 
-  // 제출 내 중복 품목 방지
-  const seen = new Set<string>();
+  // 제출 내 중복 품목 방지 — mdg_code + part_no 조합 기준 (Part No가 다르면
+  // 실제로 다른 품목이므로 같은 mdg_code라도 같이 등록할 수 있어야 한다).
+  // 구분자로 공백/하이픈이 아닌 \u0000(NUL)을 쓰는 이유는 Part No에 공백·하이픈이
+  // 흔해 충돌할 수 있어서다.
+  const seenCombos = new Set<string>();
   for (const l of lines) {
-    if (seen.has(l.mdg_code)) {
-      return { error: `같은 발주에 중복된 품목: ${l.mdg_code}`, message: null };
+    const part_no = (l.part_no ?? "").trim();
+    const key = `${l.mdg_code}\u0000${part_no.toLowerCase()}`;
+    if (seenCombos.has(key)) {
+      return {
+        error: part_no
+          ? `같은 발주에 중복된 품목: ${l.mdg_code} · ${part_no}`
+          : `같은 발주에 중복된 품목: ${l.mdg_code}`,
+        message: null,
+      };
     }
-    seen.add(l.mdg_code);
+    seenCombos.add(key);
   }
 
   const supabase = await createClient();
 
-  // MDG코드 → material_id 일괄 해석
-  const codes = [...seen];
+  // MDG코드 → material_id 일괄 해석 (조회는 mdg_code 목록 기준 — 조합 키와는 별개)
+  const codes = [...new Set(lines.map((l) => l.mdg_code))];
   const { data: mats } = await supabase
     .from("materials")
-    .select("id, mdg_code")
+    .select("id, mdg_code, part_no, manufacturer, size")
     .in("mdg_code", codes);
-  const map = new Map(
-    ((mats ?? []) as { id: number; mdg_code: string }[]).map((m) => [
-      m.mdg_code,
-      m.id,
-    ])
-  );
-  const missing = codes.filter((c) => !map.has(c));
-  if (missing.length > 0) {
-    return { error: `존재하지 않는 MDG코드: ${missing.join(", ")}`, message: null };
-  }
 
-  const rows = lines.map((l) => ({
+  const resolved = resolveMaterialsForLines(lines, (mats ?? []) as MaterialCandidate[]);
+  if (!resolved.ok) {
+    return { error: resolved.error, message: null };
+  }
+  const ids = resolved.ids;
+
+  const rows = lines.map((l, i) => ({
     po_no,
     order_date,
     vendor,
-    material_id: map.get(l.mdg_code)!,
+    material_id: ids[i],
     order_qty: l.qty,
     remark,
   }));

@@ -12,7 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { parseBulk } from "@/lib/consigned-reqs/parse-bulk";
 import { initialFormState } from "@/lib/form-state";
 
-type Line = { key: number; mdg_code: string; qty: string; bl_no: string };
+type Line = {
+  key: number;
+  mdg_code: string;
+  qty: string;
+  bl_no: string;
+  part_no: string;
+};
 
 function SubmitButton({ canEdit }: { canEdit: boolean }) {
   const { pending } = useFormStatus();
@@ -33,7 +39,7 @@ export function ConsignedReqForm({ canEdit }: { canEdit: boolean }) {
   const formRef = useRef<HTMLFormElement>(null);
   const nextKey = useRef(1);
   const [lines, setLines] = useState<Line[]>([
-    { key: 0, mdg_code: "", qty: "", bl_no: "" },
+    { key: 0, mdg_code: "", qty: "", bl_no: "", part_no: "" },
   ]);
   const [bulk, setBulk] = useState("");
   const [applied, setApplied] = useState<number | null>(null);
@@ -41,7 +47,9 @@ export function ConsignedReqForm({ canEdit }: { canEdit: boolean }) {
   useEffect(() => {
     if (state.message) {
       formRef.current?.reset();
-      setLines([{ key: nextKey.current++, mdg_code: "", qty: "", bl_no: "" }]);
+      setLines([
+        { key: nextKey.current++, mdg_code: "", qty: "", bl_no: "", part_no: "" },
+      ]);
       setBulk("");
       setApplied(null);
     }
@@ -50,13 +58,13 @@ export function ConsignedReqForm({ canEdit }: { canEdit: boolean }) {
   const addLine = () =>
     setLines((ls) => [
       ...ls,
-      { key: nextKey.current++, mdg_code: "", qty: "", bl_no: "" },
+      { key: nextKey.current++, mdg_code: "", qty: "", bl_no: "", part_no: "" },
     ]);
   const removeLine = (key: number) =>
     setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
   const setLine = (
     key: number,
-    field: "mdg_code" | "qty" | "bl_no",
+    field: "mdg_code" | "qty" | "bl_no" | "part_no",
     value: string
   ) =>
     setLines((ls) =>
@@ -67,7 +75,9 @@ export function ConsignedReqForm({ canEdit }: { canEdit: boolean }) {
     rows: { mdg_code: string; qty: string; bl_no: string }[]
   ) => {
     if (rows.length === 0) return;
-    setLines(rows.map((r) => ({ key: nextKey.current++, ...r })));
+    setLines(
+      rows.map((r) => ({ key: nextKey.current++, ...r, part_no: "" }))
+    );
     setApplied(rows.length);
   };
 
@@ -168,6 +178,9 @@ export function ConsignedReqForm({ canEdit }: { canEdit: boolean }) {
             + 품목 추가
           </Button>
         </div>
+        <p className="text-xs text-muted-foreground">
+          같은 MDG코드가 여러 자재로 등록되어 있을 때만 Part No를 입력하면 정확한 자재로 구분됩니다.
+        </p>
         <div className="flex flex-col gap-2">
           {lines.map((l) => (
             <div key={l.key} className="flex flex-wrap items-end gap-2">
@@ -179,6 +192,17 @@ export function ConsignedReqForm({ canEdit }: { canEdit: boolean }) {
                   onChange={(e) => setLine(l.key, "mdg_code", e.target.value)}
                   placeholder="예: 536691"
                   aria-label="MDG코드"
+                  disabled={!canEdit}
+                />
+              </div>
+              <div className="flex min-w-32 flex-1 flex-col gap-1.5">
+                <Label className="text-xs text-muted-foreground">Part No</Label>
+                <Input
+                  name="part_no"
+                  value={l.part_no}
+                  onChange={(e) => setLine(l.key, "part_no", e.target.value)}
+                  placeholder="중복 코드일 때만"
+                  aria-label="Part No"
                   disabled={!canEdit}
                 />
               </div>

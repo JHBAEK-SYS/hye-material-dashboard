@@ -76,6 +76,12 @@ export default async function MaterialsPage({
             >
               재고 일괄 조정
             </Link>
+            <Link
+              href="/materials/bulk-new"
+              className={buttonVariants({ variant: "outline" })}
+            >
+              신규 일괄 등록
+            </Link>
             <a href={exportHref} className={buttonVariants({ variant: "outline" })}>
               엑셀 다운로드
             </a>

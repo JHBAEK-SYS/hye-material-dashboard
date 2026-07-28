@@ -32,7 +32,7 @@ export function validateDeleteId(id: number): string | null {
 }
 
 export function validateIssueLines(
-  lines: { mdg_code: string; qty: string }[]
+  lines: { mdg_code: string; qty: string; part_no?: string }[]
 ): string | null {
   if (lines.length === 0) {
     return "품목(MDG코드)을 1개 이상 입력하세요.";
@@ -42,6 +42,7 @@ export function validateIssueLines(
   for (const line of lines) {
     const mdg_code = line.mdg_code.trim();
     const qty = line.qty.trim();
+    const part_no = (line.part_no ?? "").trim();
 
     if (!mdg_code) {
       return "MDG코드는 필수입니다.";
@@ -52,10 +53,16 @@ export function validateIssueLines(
       return `'${mdg_code}' 품목의 수량이 올바르지 않습니다.`;
     }
 
-    if (seen.has(mdg_code)) {
-      return `같은 출고에 중복된 품목: ${mdg_code}`;
+    // 중복 판정 키: mdg_code + part_no (Part No가 다르면 실제로 다른 품목이므로
+    // 같은 mdg_code라도 같이 등록할 수 있어야 한다). 구분자로 공백/하이픈이 아닌
+    // \u0000(NUL)을 쓰는 이유는 Part No에 공백·하이픈이 흔해 충돌할 수 있어서다.
+    const key = `${mdg_code}\u0000${part_no.toLowerCase()}`;
+    if (seen.has(key)) {
+      return part_no
+        ? `같은 출고에 중복된 품목: ${mdg_code} · ${part_no}`
+        : `같은 출고에 중복된 품목: ${mdg_code}`;
     }
-    seen.add(mdg_code);
+    seen.add(key);
   }
 
   return null;

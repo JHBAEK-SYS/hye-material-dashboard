@@ -148,6 +148,32 @@ describe("validateConsignedReqLines", () => {
     expect(result).not.toBeNull();
     expect(result).toContain("536691");
   });
+
+  it("같은 mdg_code라도 part_no가 다르면 중복이 아니다", () => {
+    const result = validateConsignedReqLines([
+      { mdg_code: "528191", qty: "10", part_no: "38SL-1-304" },
+      { mdg_code: "528191", qty: "5", part_no: "38SL-1.5-304" },
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it("같은 mdg_code + 같은 part_no(대소문자만 다름)이면 중복 에러를 반환한다", () => {
+    const result = validateConsignedReqLines([
+      { mdg_code: "528191", qty: "10", part_no: "abc-123" },
+      { mdg_code: "528191", qty: "5", part_no: "ABC-123" },
+    ]);
+    expect(result).not.toBeNull();
+    expect(result).toContain("528191");
+    expect(result).toContain("ABC-123");
+  });
+
+  it("part_no에 공백이 섞여도 키가 충돌하지 않는다", () => {
+    const result = validateConsignedReqLines([
+      { mdg_code: "A", qty: "10", part_no: "X Y" },
+      { mdg_code: "A", qty: "5", part_no: "X" },
+    ]);
+    expect(result).toBeNull();
+  });
 });
 
 describe("validateBlNoUpdate", () => {

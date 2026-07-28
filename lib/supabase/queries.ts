@@ -1,3 +1,4 @@
+import type { BulkNewMaterialInfo } from "@/lib/materials/bulk-new";
 import { isOutstanding } from "@/lib/receive/validate";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -750,4 +751,40 @@ export async function getStockStatusByMdgCodes(
   }
 
   return map;
+}
+
+// ---------------------------------------------------------------------------
+// 자재 신규 일괄 등록(엑셀 업로드) 용: materials 테이블 전량 조회.
+// ---------------------------------------------------------------------------
+
+/**
+ * 자재 신규 일괄 등록 미리보기/확정에 쓸 기존 자재 전량 조회.
+ *
+ * `v_stock_status` 뷰가 아니라 `materials` 테이블을 직접 조회한다 — 뷰는
+ * mdg_code 가 NULL 인 행(현재 4건)을 제외할 수 있는데, 그 행들이 바로
+ * fill_existing(Part No만 있고 MDG코드가 비어 있는 기존 행) 판정 대상이라
+ * 반드시 포함되어야 한다.
+ *
+ * Supabase/PostgREST 는 단일 select 응답을 최대 1,000행으로 제한한다.
+ * materials 는 2025-07 기준 2,908행이라 한 번에 다 못 읽으므로, 반드시
+ * fetchAllRows 로 1,000행씩 배치 조회해 합친다. 이걸 빠뜨리면 뒤쪽 1,900여
+ * 행이 "존재하지 않음"으로 오판되어 대량 중복 자재가 생성된다.
+ *
+ * .order("id", { ascending: true }) 로 정렬해 fill_ambiguous 의 candidateIds
+ * 순서와 상속(inherit) 결과가 호출마다 항상 같게 만든다.
+ */
+export async function getAllMaterialsForBulkNew(): Promise<
+  BulkNewMaterialInfo[]
+> {
+  const supabase = await createClient();
+
+  return fetchAllRows<BulkNewMaterialInfo>(
+    (from, to) =>
+      supabase
+        .from("materials")
+        .select("id, mdg_code, part_no, manufacturer, material_name, size")
+        .order("id", { ascending: true })
+        .range(from, to),
+    "자재 전체 조회 실패"
+  );
 }

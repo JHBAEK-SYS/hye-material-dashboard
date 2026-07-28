@@ -13,6 +13,10 @@ import {
   remainingQty,
   validateReceiveInput,
 } from "@/lib/receive/validate";
+import {
+  resolveMaterialsForLines,
+  type MaterialCandidate,
+} from "@/lib/materials/resolve-material";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "@/lib/form-state";
 
@@ -35,19 +39,25 @@ export async function createConsignedReq(
   const mdgCodes = formData.getAll("mdg_code").map((v) => String(v).trim());
   const qtys = formData.getAll("qty").map((v) => String(v).trim());
   const blNos = formData.getAll("bl_no").map((v) => String(v).trim());
+  const partNos = formData.getAll("part_no").map((v) => String(v).trim());
 
   const headerError = validateConsignedReqHeader({ sg_no, request_date });
   if (headerError) {
     return { error: headerError, message: null };
   }
 
-  // 품목 줄 취합 (빈 줄 건너뜀). mdg_code/qty/bl_no는 폼에서 같은 인덱스로 제출되므로
-  // 빈 줄을 건너뛰어도 i는 세 배열에서 동일한 인덱스를 가리켜야 어긋나지 않는다.
-  const lines: { mdg_code: string; qty: string; bl_no: string }[] = [];
+  // 품목 줄 취합 (빈 줄 건너뜀). mdg_code/qty/bl_no/part_no는 폼에서 같은 인덱스로 제출되므로
+  // 빈 줄을 건너뛰어도 i는 배열들에서 동일한 인덱스를 가리켜야 어긋나지 않는다.
+  const lines: { mdg_code: string; qty: string; bl_no: string; part_no?: string }[] = [];
   for (let i = 0; i < mdgCodes.length; i++) {
     const code = mdgCodes[i];
     if (!code) continue;
-    lines.push({ mdg_code: code, qty: qtys[i] ?? "", bl_no: blNos[i] ?? "" });
+    lines.push({
+      mdg_code: code,
+      qty: qtys[i] ?? "",
+      bl_no: blNos[i] ?? "",
+      part_no: partNos[i],
+    });
   }
 
   const linesError = validateConsignedReqLines(lines);
@@ -61,23 +71,19 @@ export async function createConsignedReq(
   const codes = [...new Set(lines.map((l) => l.mdg_code))];
   const { data: mats } = await supabase
     .from("materials")
-    .select("id, mdg_code")
+    .select("id, mdg_code, part_no, manufacturer, size")
     .in("mdg_code", codes);
-  const map = new Map(
-    ((mats ?? []) as { id: number; mdg_code: string }[]).map((m) => [
-      m.mdg_code,
-      m.id,
-    ])
-  );
-  const missing = codes.filter((c) => !map.has(c));
-  if (missing.length > 0) {
-    return { error: `존재하지 않는 MDG코드: ${missing.join(", ")}`, message: null };
-  }
 
-  const rows = lines.map((l) => ({
+  const resolved = resolveMaterialsForLines(lines, (mats ?? []) as MaterialCandidate[]);
+  if (!resolved.ok) {
+    return { error: resolved.error, message: null };
+  }
+  const ids = resolved.ids;
+
+  const rows = lines.map((l, i) => ({
     sg_no,
     request_date,
-    material_id: map.get(l.mdg_code)!,
+    material_id: ids[i],
     request_qty: Number(l.qty),
     remark,
     bl_no: l.bl_no || null,

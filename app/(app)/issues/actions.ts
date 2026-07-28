@@ -8,6 +8,10 @@ import {
   validateIssueHeader,
   validateIssueLines,
 } from "@/lib/issues/validate";
+import {
+  resolveMaterialsForLines,
+  type MaterialCandidate,
+} from "@/lib/materials/resolve-material";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "@/lib/form-state";
 
@@ -31,6 +35,7 @@ export async function createIssue(
 
   const mdgCodes = formData.getAll("mdg_code").map((v) => String(v).trim());
   const qtys = formData.getAll("qty").map((v) => String(v).trim());
+  const partNos = formData.getAll("part_no").map((v) => String(v).trim());
 
   const headerError = validateIssueHeader({ req_no, issue_date });
   if (headerError) {
@@ -38,11 +43,11 @@ export async function createIssue(
   }
 
   // 품목 줄 취합 (빈 줄 건너뜀)
-  const lines: { mdg_code: string; qty: string }[] = [];
+  const lines: { mdg_code: string; qty: string; part_no?: string }[] = [];
   for (let i = 0; i < mdgCodes.length; i++) {
     const code = mdgCodes[i];
     if (!code) continue;
-    lines.push({ mdg_code: code, qty: qtys[i] ?? "" });
+    lines.push({ mdg_code: code, qty: qtys[i] ?? "", part_no: partNos[i] });
   }
 
   const linesError = validateIssueLines(lines);
@@ -56,23 +61,19 @@ export async function createIssue(
   const codes = [...new Set(lines.map((l) => l.mdg_code))];
   const { data: mats } = await supabase
     .from("materials")
-    .select("id, mdg_code")
+    .select("id, mdg_code, part_no, manufacturer, size")
     .in("mdg_code", codes);
-  const map = new Map(
-    ((mats ?? []) as { id: number; mdg_code: string }[]).map((m) => [
-      m.mdg_code,
-      m.id,
-    ])
-  );
-  const missing = codes.filter((c) => !map.has(c));
-  if (missing.length > 0) {
-    return { error: `존재하지 않는 MDG코드: ${missing.join(", ")}`, message: null };
-  }
 
-  const rows = lines.map((l) => ({
+  const resolved = resolveMaterialsForLines(lines, (mats ?? []) as MaterialCandidate[]);
+  if (!resolved.ok) {
+    return { error: resolved.error, message: null };
+  }
+  const ids = resolved.ids;
+
+  const rows = lines.map((l, i) => ({
     req_no,
     issue_date,
-    material_id: map.get(l.mdg_code)!,
+    material_id: ids[i],
     qty: Number(l.qty),
     tool_name,
     staff,

@@ -21,7 +21,7 @@ export function validateConsignedReqHeader(input: {
 }
 
 export function validateConsignedReqLines(
-  lines: { mdg_code: string; qty: string; bl_no?: string }[]
+  lines: { mdg_code: string; qty: string; bl_no?: string; part_no?: string }[]
 ): string | null {
   if (lines.length === 0) {
     return "품목(MDG코드)을 1개 이상 입력하세요.";
@@ -31,6 +31,7 @@ export function validateConsignedReqLines(
   for (const line of lines) {
     const mdg_code = line.mdg_code.trim();
     const qty = line.qty.trim();
+    const part_no = (line.part_no ?? "").trim();
 
     if (!mdg_code) {
       return "MDG코드는 필수입니다.";
@@ -44,10 +45,16 @@ export function validateConsignedReqLines(
     // bl_no(B/L NO)는 선택 입력 — 선적 시점에 나오므로 청구 등록 시점엔 없을 수 있다.
     // 값이 있든 없든 여기서는 검증하지 않는다(별도 길이 검증은 validateBlNoUpdate 참고).
 
-    if (seen.has(mdg_code)) {
-      return `같은 사급청구에 중복된 품목: ${mdg_code}`;
+    // 중복 판정 키: mdg_code + part_no (Part No가 다르면 실제로 다른 품목이므로
+    // 같은 mdg_code라도 같이 등록할 수 있어야 한다). 구분자로 공백/하이픈이 아닌
+    // \u0000(NUL)을 쓰는 이유는 Part No에 공백·하이픈이 흔해 충돌할 수 있어서다.
+    const key = `${mdg_code}\u0000${part_no.toLowerCase()}`;
+    if (seen.has(key)) {
+      return part_no
+        ? `같은 사급청구에 중복된 품목: ${mdg_code} · ${part_no}`
+        : `같은 사급청구에 중복된 품목: ${mdg_code}`;
     }
-    seen.add(mdg_code);
+    seen.add(key);
   }
 
   return null;
