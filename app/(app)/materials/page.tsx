@@ -13,13 +13,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getCanEdit } from "@/lib/auth/editor";
+import {
+  activeOnlyParam,
+  parseActiveOnly,
+} from "@/lib/materials/active-filter";
 import { getMaterials } from "@/lib/supabase/queries";
 import { STOCK_STATUSES, type StockStatus } from "@/types/database";
 
 type SearchParams = Promise<{
   q?: string;
   status?: string;
-  active?: string;
+  active?: string | string[];
   page?: string;
 }>;
 
@@ -37,7 +41,7 @@ export default async function MaterialsPage({
   const status = STOCK_STATUSES.includes(sp.status as StockStatus)
     ? (sp.status as StockStatus)
     : undefined;
-  const activeOnly = sp.active === "1";
+  const activeOnly = parseActiveOnly(sp.active);
   const page = Number(sp.page) > 0 ? Number(sp.page) : 1;
 
   const result = await getMaterials({ search, status, activeOnly, page });
@@ -47,7 +51,7 @@ export default async function MaterialsPage({
     const params = new URLSearchParams();
     if (search) params.set("q", search);
     if (status) params.set("status", status);
-    if (activeOnly) params.set("active", "1");
+    params.set("active", activeOnlyParam(activeOnly));
     params.set("page", String(nextPage));
     return `/materials?${params.toString()}`;
   };
@@ -59,7 +63,7 @@ export default async function MaterialsPage({
     const params = new URLSearchParams();
     if (search) params.set("q", search);
     if (status) params.set("status", status);
-    if (activeOnly) params.set("active", "1");
+    params.set("active", activeOnlyParam(activeOnly));
     const qs = params.toString();
     return `/api/export/materials${qs ? `?${qs}` : ""}`;
   })();
@@ -138,6 +142,8 @@ export default async function MaterialsPage({
           </select>
         </div>
         <label className="flex h-9 items-center gap-2 text-sm">
+          {/* 체크 해제 시에도 값이 전송되도록 하는 짝 — parseActiveOnly 주석 참고 */}
+          <input type="hidden" name="active" value="0" />
           <input
             type="checkbox"
             name="active"

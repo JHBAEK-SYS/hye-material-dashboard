@@ -103,7 +103,10 @@ export async function GET(
         const status = STOCK_STATUSES.includes(statusParam as StockStatus)
           ? (statusParam as StockStatus)
           : undefined;
-        const activeOnly = searchParams.get("active") === "1";
+        // 자재 목록 화면과 같은 기본값(활성만 켜짐). 화면에서 내려오는 링크는
+        // active 를 "1"/"0" 으로 항상 명시하므로, 파라미터가 없는 직접 호출만
+        // 기본값을 타게 된다.
+        const activeOnly = searchParams.get("active") !== "0";
         const rows = await getAllMaterialsForExport({
           search: q,
           status,
